@@ -1,0 +1,16 @@
+{
+  "name": "mecapy-docs",
+  "version": "1.0.0",
+  "description": "MecaPy documentation hosted on Mintlify",
+  "scripts": {
+    "dev": "mintlify dev",
+    "install-mintlify": "npm install -g mintlify"
+  },
+  "keywords": [
+    "mecapy",
+    "documentation",
+    "mintlify"
+  ],
+  "author": "MecaPy Team",
+  "license": "MIT"
+}

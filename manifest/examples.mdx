@@ -1,0 +1,624 @@
+---
+title: 'Exemples'
+description: 'Cas d\'usage complets et bonnes pratiques'
+---
+
+## Package minimal
+
+Le plus simple : une seule fonction.
+
+<CodeGroup>
+
+```yaml mecapy.yml
+name: simple-calc
+description: Calculateur simple
+
+functions:
+  add:
+    handler: calculator:add
+```
+
+```python calculator.py
+def add(x: float, y: float) -> float:
+    """Additionne deux nombres."""
+    return x + y
+```
+
+</CodeGroup>
+
+<Note>
+  Pas besoin de `requirements.txt` si vous n'avez pas de dépendances externes.
+</Note>
+
+## Package avec validation
+
+Fonctions avec contraintes Pydantic.
+
+<CodeGroup>
+
+```yaml mecapy.yml
+name: calculs-mecaniques
+description: Calculs avec validation
+
+functions:
+  calcul-contrainte:
+    handler: calculs:calculer_contrainte
+    description: Calcul de contrainte avec validation
+
+  analyser-designation:
+    handler: calculs:analyser_designation
+    description: Analyse une désignation de vis
+```
+
+```python calculs.py
+from typing import Annotated, TypedDict, Literal
+from pydantic import Field
+
+def calculer_contrainte(
+    force: Annotated[float, Field(
+        description="Force en Newton",
+        ge=0,
+        le=500000,
+        examples=[1000, 5000, 10000]
+    )],
+    diametre: Annotated[float, Field(
+        description="Diamètre en mm",
+        ge=3,
+        le=100,
+        examples=[6, 8, 10, 12, 16]
+    )]
+) -> dict:
+    """
+    Calcule la contrainte de traction.
+
+    Parameters
+    ----------
+    force : float
+        Force de traction appliquée
+    diametre : float
+        Diamètre nominal de la vis
+
+    Returns
+    -------
+    dict
+        Contrainte et aire
+    """
+    aire = 3.14 * (diametre / 2) ** 2
+    contrainte = force / aire
+    return {
+        "contrainte": round(contrainte, 2),
+        "aire": round(aire, 2),
+        "unite": "MPa"
+    }
+
+def analyser_designation(
+    designation: Annotated[str, Field(
+        pattern="^M[0-9]{1,2}$",
+        examples=["M6", "M8", "M12", "M16"]
+    )]
+) -> dict:
+    """
+    Analyse une désignation de vis métrique.
+
+    Parameters
+    ----------
+    designation : str
+        Désignation (M6, M8, M12, etc.)
+
+    Returns
+    -------
+    dict
+        Informations sur la vis
+    """
+    diametre = int(designation[1:])
+    return {
+        "diametre": diametre,
+        "type": "metrique",
+        "designation": designation
+    }
+```
+
+</CodeGroup>
+
+## Package POO avec méthodes
+
+Utilisation de classes avec état.
+
+<CodeGroup>
+
+```yaml mecapy.yml
+name: mecapy-vis
+description: Calculs d'assemblages boulonnés
+
+functions:
+  # Méthode d'instance
+  calcul-traction:
+    handler: vis.Vis:calculer_contrainte_traction
+    description: Contrainte de traction
+    init: [diametre, materiau]
+
+  calcul-cisaillement:
+    handler: vis.Vis:calculer_cisaillement
+    description: Contrainte de cisaillement
+    init: [diametre, materiau]
+
+  # Classmethod
+  creation-vis:
+    handler: vis.Vis:depuis_designation
+    description: Crée une vis depuis désignation
+
+  # Méthode d'une autre classe
+  calcul-precharge:
+    handler: vis.BoulonHR:calculer_precharge
+    description: Précharge pour boulon HR
+    init: [diametre, classe]
+
+runtime:
+  python: "3.12"
+  timeout: 300
+```
+
+```python vis.py
+from typing import TypedDict, Literal, Annotated
+from pydantic import Field
+
+class ResultatContrainte(TypedDict):
+    """Résultat d'un calcul de contrainte."""
+    contrainte: float
+    statut: Literal["OK", "LIMITE", "RUPTURE"]
+    coefficient_securite: float
+    unite: str
+
+class Vis:
+    """Classe représentant une vis."""
+
+    def __init__(self, diametre: float, materiau: str):
+        """
+        Initialise une vis.
+
+        Parameters
+        ----------
+        diametre : float
+            Diamètre nominal en mm
+        materiau : str
+            Matériau (acier, inox)
+        """
+        self.diametre = diametre
+        self.materiau = materiau
+        self.aire_section = 3.14 * (diametre / 2) ** 2
+
+        # Résistance selon matériau
+        if materiau == "acier":
+            self.resistance = 400  # MPa
+        elif materiau == "inox":
+            self.resistance = 500  # MPa
+        else:
+            self.resistance = 300  # MPa
+
+    def calculer_contrainte_traction(
+        self,
+        force: Annotated[float, Field(ge=0, le=500000)]
+    ) -> ResultatContrainte:
+        """
+        Calcule la contrainte de traction.
+
+        Parameters
+        ----------
+        force : float
+            Force de traction en N
+
+        Returns
+        -------
+        ResultatContrainte
+            Résultat avec statut
+        """
+        contrainte = force / self.aire_section
+        coef = self.resistance / contrainte
+
+        if coef >= 2:
+            statut = "OK"
+        elif coef >= 1.5:
+            statut = "LIMITE"
+        else:
+            statut = "RUPTURE"
+
+        return {
+            "contrainte": round(contrainte, 2),
+            "statut": statut,
+            "coefficient_securite": round(coef, 2),
+            "unite": "MPa"
+        }
+
+    def calculer_cisaillement(
+        self,
+        force: Annotated[float, Field(ge=0, le=500000)]
+    ) -> dict:
+        """Calcule la contrainte de cisaillement."""
+        tau = force / self.aire_section
+        return {
+            "cisaillement": round(tau, 2),
+            "unite": "MPa"
+        }
+
+    @classmethod
+    def depuis_designation(cls, designation: str) -> dict:
+        """
+        Crée une vis depuis sa désignation.
+
+        Parameters
+        ----------
+        designation : str
+            Désignation (M6, M8, M12, etc.)
+
+        Returns
+        -------
+        dict
+            Informations de la vis créée
+        """
+        diametre = int(designation[1:])
+        vis = cls(diametre, "acier")
+        return {
+            "diametre": vis.diametre,
+            "materiau": vis.materiau,
+            "aire_section": round(vis.aire_section, 2),
+            "resistance": vis.resistance
+        }
+
+class BoulonHR:
+    """Boulon haute résistance."""
+
+    def __init__(
+        self,
+        diametre: float,
+        classe: Literal["8.8", "10.9", "12.9"]
+    ):
+        """
+        Initialise un boulon HR.
+
+        Parameters
+        ----------
+        diametre : float
+            Diamètre en mm
+        classe : str
+            Classe de résistance
+        """
+        self.diametre = diametre
+        self.classe = classe
+
+        # Résistance selon classe
+        resistances = {
+            "8.8": 640,
+            "10.9": 900,
+            "12.9": 1080
+        }
+        self.resistance = resistances[classe]
+
+    def calculer_precharge(self) -> dict:
+        """
+        Calcule la précharge recommandée.
+
+        Returns
+        -------
+        dict
+            Précharge et couple de serrage
+        """
+        aire = 3.14 * (self.diametre / 2) ** 2
+        precharge = 0.7 * self.resistance * aire
+        couple = 0.2 * precharge * self.diametre
+
+        return {
+            "precharge": round(precharge, 2),
+            "couple_serrage": round(couple, 2),
+            "classe": self.classe,
+            "unite_precharge": "N",
+            "unite_couple": "N.mm"
+        }
+```
+
+</CodeGroup>
+
+<Tip>
+  Utilisez les **classmethods** pour créer des instances avec différentes configurations (factory pattern).
+</Tip>
+
+## Package avec runtime personnalisé
+
+Différentes configurations par fonction.
+
+<CodeGroup>
+
+```yaml mecapy.yml
+name: advanced-package
+description: Package avec runtime custom
+
+functions:
+  # Fonction rapide - peu de ressources
+  quick-calc:
+    handler: tasks:quick_calculation
+    description: Calcul rapide
+    runtime:
+      timeout: 30
+      memory: 512
+
+  # Fonction lourde - beaucoup de ressources
+  heavy-calc:
+    handler: tasks:heavy_calculation
+    description: Calcul intensif
+    runtime:
+      timeout: 900
+      memory: 8192
+
+  # Fonction normale - utilise les defaults
+  normal-calc:
+    handler: tasks:normal_calculation
+    description: Calcul standard
+
+# Defaults pour toutes les fonctions
+runtime:
+  python: "3.12"
+  timeout: 300
+  memory: 2048
+
+tests:
+  framework: pytest
+  min_coverage: 80
+```
+
+```python tasks.py
+import time
+from typing import List
+
+def quick_calculation(numbers: List[float]) -> float:
+    """Calcul rapide - moyenne simple."""
+    return sum(numbers) / len(numbers)
+
+def heavy_calculation(data: List[float]) -> dict:
+    """
+    Calcul intensif - traitement complexe.
+
+    Simule un calcul qui prend du temps et de la mémoire.
+    """
+    # Simulation calcul lourd
+    results = []
+    for _ in range(1000):
+        results.extend([x**2 for x in data])
+
+    return {
+        "count": len(results),
+        "sum": sum(results),
+        "avg": sum(results) / len(results)
+    }
+
+def normal_calculation(x: float, y: float) -> float:
+    """Calcul standard."""
+    return (x + y) / 2
+```
+
+</CodeGroup>
+
+## Package avec tests
+
+Incluez des tests pytest.
+
+<CodeGroup>
+
+```yaml mecapy.yml
+name: tested-package
+description: Package avec tests validés
+
+functions:
+  calculate:
+    handler: calculator:calculate
+
+tests:
+  framework: pytest
+  min_coverage: 80
+  command: "pytest tests/ -v"
+```
+
+```python calculator.py
+from typing import Literal
+
+def calculate(
+    operation: Literal["add", "sub", "mul", "div"],
+    x: float,
+    y: float
+) -> float:
+    """
+    Effectue une opération mathématique.
+
+    Parameters
+    ----------
+    operation : str
+        Opération (add, sub, mul, div)
+    x : float
+        Premier nombre
+    y : float
+        Second nombre
+
+    Returns
+    -------
+    float
+        Résultat de l'opération
+
+    Raises
+    ------
+    ValueError
+        Si l'opération est invalide
+    ZeroDivisionError
+        Si division par zéro
+    """
+    if operation == "add":
+        return x + y
+    elif operation == "sub":
+        return x - y
+    elif operation == "mul":
+        return x * y
+    elif operation == "div":
+        if y == 0:
+            raise ZeroDivisionError("Division par zéro")
+        return x / y
+    else:
+        raise ValueError(f"Opération invalide: {operation}")
+```
+
+```python tests/test_calculator.py
+import pytest
+from calculator import calculate
+
+def test_addition():
+    assert calculate("add", 2, 3) == 5
+
+def test_soustraction():
+    assert calculate("sub", 5, 3) == 2
+
+def test_multiplication():
+    assert calculate("mul", 2, 3) == 6
+
+def test_division():
+    assert calculate("div", 6, 2) == 3
+
+def test_division_par_zero():
+    with pytest.raises(ZeroDivisionError):
+        calculate("div", 5, 0)
+
+def test_operation_invalide():
+    with pytest.raises(ValueError):
+        calculate("invalid", 1, 2)
+```
+
+```txt requirements.txt
+pytest>=7.0.0
+```
+
+</CodeGroup>
+
+<Note>
+  MecaPy exécute vos tests automatiquement lors du déploiement et refuse le déploiement si les tests échouent.
+</Note>
+
+## Structure de projet complète
+
+```
+mon-package/
+├── mecapy.yml              # ✅ Manifest à la racine
+├── requirements.txt        # ✅ Dépendances
+├── README.md              # ✅ Documentation
+├── mon_package/           # 📁 Code source
+│   ├── __init__.py
+│   ├── calculs.py
+│   ├── vis.py
+│   └── utils.py
+├── tests/                 # 📁 Tests
+│   ├── __init__.py
+│   ├── test_calculs.py
+│   └── test_vis.py
+└── .gitignore            # ✅ Git ignore
+```
+
+## Bonnes pratiques
+
+<CardGroup cols={2}>
+  <Card title="Type hints partout" icon="code">
+    Sur tous les paramètres et retours de fonctions
+  </Card>
+  <Card title="Pydantic Field pour validation" icon="shield-check">
+    Utilisez `ge`, `le`, `pattern` pour les contraintes
+  </Card>
+  <Card title="TypedDict pour retours" icon="brackets-curly">
+    Retours structurés avec types explicites
+  </Card>
+  <Card title="Docstrings NumPy" icon="file-lines">
+    Format NumPy pour descriptions automatiques
+  </Card>
+  <Card title="Tests pytest" icon="vial">
+    Au moins 80% de couverture
+  </Card>
+  <Card title="Nommage cohérent" icon="text">
+    kebab-case pour packages et fonctions
+  </Card>
+</CardGroup>
+
+## Erreurs courantes à éviter
+
+<AccordionGroup>
+  <Accordion title="Pas de type hints" icon="triangle-exclamation">
+    **❌ Mauvais** :
+    ```python
+    def calculate(x, y):  # Pas de types
+        return x + y
+    ```
+
+    **✅ Bon** :
+    ```python
+    def calculate(x: float, y: float) -> float:
+        return x + y
+    ```
+  </Accordion>
+
+  <Accordion title="Méthode sans init" icon="triangle-exclamation">
+    **❌ Mauvais** :
+    ```yaml
+    handler: vis.Vis:calculer
+    # Manque init !
+    ```
+
+    **✅ Bon** :
+    ```yaml
+    handler: vis.Vis:calculer
+    init: [diametre, materiau]
+    ```
+  </Accordion>
+
+  <Accordion title="Validation manquante" icon="triangle-exclamation">
+    **❌ Mauvais** :
+    ```python
+    def calc(force: float):  # Pas de contraintes
+        return force / 100
+    ```
+
+    **✅ Bon** :
+    ```python
+    def calc(
+        force: Annotated[float, Field(ge=0, le=500000)]
+    ):
+        return force / 100
+    ```
+  </Accordion>
+
+  <Accordion title="Retour dict non typé" icon="triangle-exclamation">
+    **❌ Mauvais** :
+    ```python
+    def analyze() -> dict:  # dict générique
+        return {"result": 42}
+    ```
+
+    **✅ Bon** :
+    ```python
+    class Result(TypedDict):
+        result: int
+
+    def analyze() -> Result:
+        return {"result": 42}
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Prochaines étapes
+
+<CardGroup cols={2}>
+  <Card
+    title="Déployer votre package"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Guide de déploiement étape par étape
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api-reference/introduction"
+  >
+    Documentation complète de l'API
+  </Card>
+</CardGroup>

@@ -1,0 +1,528 @@
+---
+title: 'Schemas & Auto-introspection'
+description: 'Comment MecaPy génère automatiquement les schemas de validation'
+---
+
+## Principe
+
+MecaPy **génère automatiquement** les schemas de validation JSON depuis votre code Python.
+
+<Note>
+  **Pas besoin de spécifier les schemas manuellement** dans 90% des cas !
+</Note>
+
+## Ce qui est généré
+
+<CardGroup cols={2}>
+  <Card title="Input schemas" icon="arrow-right-to-bracket">
+    Depuis les **type hints** et **Pydantic Field**
+  </Card>
+  <Card title="Output schemas" icon="arrow-left-from-bracket">
+    Depuis les **TypedDict** et type hints de retour
+  </Card>
+  <Card title="Descriptions" icon="file-lines">
+    Depuis les **docstrings NumPy**
+  </Card>
+  <Card title="Validation" icon="shield-check">
+    Depuis les **contraintes Pydantic** (ge, le, pattern...)
+  </Card>
+</CardGroup>
+
+## Input Schemas
+
+### Type hints de base
+
+MecaPy utilise vos type hints Python pour générer les schemas.
+
+<CodeGroup>
+
+```python code.py
+def calculer(force: float, diametre: float) -> float:
+    """Calcule la contrainte."""
+    return force / (3.14 * (diametre/2)**2)
+```
+
+```json Schema généré
+{
+  "type": "object",
+  "properties": {
+    "force": {
+      "type": "number",
+      "description": "Force appliquée"
+    },
+    "diametre": {
+      "type": "number",
+      "description": "Diamètre"
+    }
+  },
+  "required": ["force", "diametre"]
+}
+```
+
+</CodeGroup>
+
+### Mapping des types
+
+| Type Python | Type JSON Schema |
+|-------------|------------------|
+| `int` | `integer` |
+| `float` | `number` |
+| `str` | `string` |
+| `bool` | `boolean` |
+| `list` | `array` |
+| `dict` | `object` |
+
+### Contraintes avec Pydantic Field
+
+Pour ajouter des **contraintes de validation** :
+
+<CodeGroup>
+
+```python code.py
+from typing import Annotated
+from pydantic import Field
+
+def calculer(
+    force: Annotated[float, Field(
+        description="Force appliquée en Newton",
+        ge=0,           # Greater or Equal (≥ 0)
+        le=500000,      # Less or Equal (≤ 500000)
+        examples=[1000, 5000, 10000]
+    )],
+    diametre: Annotated[float, Field(
+        description="Diamètre de la vis en mm",
+        ge=3,
+        le=100,
+        examples=[6, 8, 10, 12, 16]
+    )]
+) -> float:
+    """Calcule la contrainte de traction."""
+    return force / (3.14 * (diametre/2)**2)
+```
+
+```json Schema généré
+{
+  "type": "object",
+  "properties": {
+    "force": {
+      "type": "number",
+      "description": "Force appliquée en Newton",
+      "minimum": 0,
+      "maximum": 500000,
+      "examples": [1000, 5000, 10000]
+    },
+    "diametre": {
+      "type": "number",
+      "description": "Diamètre de la vis en mm",
+      "minimum": 3,
+      "maximum": 100,
+      "examples": [6, 8, 10, 12, 16]
+    }
+  },
+  "required": ["force", "diametre"]
+}
+```
+
+</CodeGroup>
+
+<Tip>
+  MecaPy **valide automatiquement** ces contraintes avant d'appeler votre fonction !
+</Tip>
+
+### Contraintes disponibles
+
+| Contrainte | Description | Exemple |
+|------------|-------------|---------|
+| `ge` | Greater or Equal (≥) | `ge=0` |
+| `le` | Less or Equal (≤) | `le=100` |
+| `gt` | Greater Than (>) | `gt=0` |
+| `lt` | Less Than (<) | `lt=100` |
+| `min_length` | Longueur minimale (string/array) | `min_length=3` |
+| `max_length` | Longueur maximale (string/array) | `max_length=50` |
+| `pattern` | Regex pattern (string) | `pattern="^[A-Z]{3}$"` |
+| `examples` | Exemples de valeurs | `examples=[10, 20]` |
+
+### Validation avec pattern
+
+<CodeGroup>
+
+```python code.py
+from typing import Annotated
+from pydantic import Field
+
+def analyser_designation(
+    designation: Annotated[str, Field(
+        description="Désignation de vis (M6, M8, M12...)",
+        pattern="^M[0-9]{1,2}$",
+        examples=["M6", "M8", "M12", "M16"]
+    )]
+) -> dict:
+    """Analyse la désignation d'une vis."""
+    diametre = int(designation[1:])
+    return {"diametre": diametre, "type": "metrique"}
+```
+
+```json Schema généré
+{
+  "type": "object",
+  "properties": {
+    "designation": {
+      "type": "string",
+      "description": "Désignation de vis (M6, M8, M12...)",
+      "pattern": "^M[0-9]{1,2}$",
+      "examples": ["M6", "M8", "M12", "M16"]
+    }
+  },
+  "required": ["designation"]
+}
+```
+
+</CodeGroup>
+
+### Paramètres optionnels
+
+Utilisez des valeurs par défaut :
+
+<CodeGroup>
+
+```python code.py
+def calculer(
+    force: float,
+    diametre: float,
+    coefficient: float = 1.5  # Optionnel avec défaut
+) -> float:
+    """Calcule avec coefficient de sécurité."""
+    return (force / (3.14 * (diametre/2)**2)) / coefficient
+```
+
+```json Schema généré
+{
+  "type": "object",
+  "properties": {
+    "force": {"type": "number"},
+    "diametre": {"type": "number"},
+    "coefficient": {
+      "type": "number",
+      "default": 1.5
+    }
+  },
+  "required": ["force", "diametre"]
+  // coefficient n'est PAS requis
+}
+```
+
+</CodeGroup>
+
+## Output Schemas
+
+### Type hints simples
+
+<CodeGroup>
+
+```python code.py
+def add(x: float, y: float) -> float:
+    """Additionne deux nombres."""
+    return x + y
+```
+
+```json Schema généré
+{
+  "type": "number"
+}
+```
+
+</CodeGroup>
+
+### TypedDict pour structures
+
+Pour des retours **structurés**, utilisez `TypedDict` :
+
+<CodeGroup>
+
+```python code.py
+from typing import TypedDict, Literal
+
+class ResultatCalcul(TypedDict):
+    """Résultat d'un calcul de contrainte."""
+    contrainte: float
+    statut: Literal["OK", "LIMITE", "RUPTURE"]
+    coefficient_securite: float
+    unite: str
+
+def analyser(force: float, resistance: float) -> ResultatCalcul:
+    """
+    Analyse structurelle.
+
+    Parameters
+    ----------
+    force : float
+        Force appliquée
+    resistance : float
+        Résistance du matériau
+
+    Returns
+    -------
+    ResultatCalcul
+        Résultat d'analyse avec statut
+    """
+    contrainte = force / resistance
+    coef = resistance / force
+
+    if coef >= 2:
+        statut = "OK"
+    elif coef >= 1.5:
+        statut = "LIMITE"
+    else:
+        statut = "RUPTURE"
+
+    return {
+        "contrainte": contrainte,
+        "statut": statut,
+        "coefficient_securite": coef,
+        "unite": "MPa"
+    }
+```
+
+```json Schema généré
+{
+  "type": "object",
+  "properties": {
+    "contrainte": {
+      "type": "number"
+    },
+    "statut": {
+      "type": "string",
+      "enum": ["OK", "LIMITE", "RUPTURE"]
+    },
+    "coefficient_securite": {
+      "type": "number"
+    },
+    "unite": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "contrainte",
+    "statut",
+    "coefficient_securite",
+    "unite"
+  ]
+}
+```
+
+</CodeGroup>
+
+<Tip>
+  `Literal` génère automatiquement un `enum` dans le schema !
+</Tip>
+
+## Descriptions avec docstrings
+
+MecaPy extrait les descriptions depuis les **docstrings NumPy**.
+
+<CodeGroup>
+
+```python code.py
+def calculer_contrainte(force: float, diametre: float) -> dict:
+    """
+    Calcule la contrainte de traction dans une vis.
+
+    Cette fonction utilise la formule de RDM classique pour
+    calculer la contrainte normale de traction.
+
+    Parameters
+    ----------
+    force : float
+        Force de traction appliquée sur la vis, en Newton.
+        Doit être positive.
+    diametre : float
+        Diamètre nominal de la vis en millimètres.
+        Généralement entre 3 et 100 mm.
+
+    Returns
+    -------
+    dict
+        Dictionnaire contenant :
+        - contrainte : Contrainte calculée en MPa
+        - aire : Aire de la section en mm²
+    """
+    aire = 3.14 * (diametre / 2) ** 2
+    contrainte = force / aire
+    return {"contrainte": contrainte, "aire": aire}
+```
+
+```json Descriptions extraites
+{
+  "function_description": "Calcule la contrainte de traction dans une vis. Cette fonction utilise la formule de RDM classique...",
+  "parameters": {
+    "force": "Force de traction appliquée sur la vis, en Newton. Doit être positive.",
+    "diametre": "Diamètre nominal de la vis en millimètres. Généralement entre 3 et 100 mm."
+  },
+  "returns": "Dictionnaire contenant : - contrainte : Contrainte calculée en MPa - aire : Aire de la section en mm²"
+}
+```
+
+</CodeGroup>
+
+### Format docstring NumPy
+
+```python
+def ma_fonction(param1: type1, param2: type2) -> return_type:
+    """
+    Description courte de la fonction.
+
+    Description détaillée optionnelle sur plusieurs lignes.
+
+    Parameters
+    ----------
+    param1 : type1
+        Description de param1.
+        Peut être sur plusieurs lignes.
+    param2 : type2
+        Description de param2
+
+    Returns
+    -------
+    return_type
+        Description du retour
+    """
+```
+
+<Note>
+  Le format **NumPy docstring** est recommandé pour une extraction optimale des descriptions.
+</Note>
+
+## Overrides manuels
+
+Dans de rares cas (< 10%), vous pouvez override les schemas :
+
+```yaml mecapy.yml
+functions:
+  fonction-complexe:
+    handler: module:advanced
+    # Override manuel du schema d'entrée
+    inputs_schema:
+      type: object
+      properties:
+        custom_field:
+          type: string
+          pattern: "^CUSTOM-[0-9]{4}$"
+      required: [custom_field]
+    # Output schema reste auto-généré ✅
+```
+
+<Warning>
+  N'utilisez les overrides que si l'auto-introspection ne suffit vraiment pas. Privilégiez toujours les type hints Python.
+</Warning>
+
+## Exemples complets
+
+<AccordionGroup>
+  <Accordion title="Validation simple avec contraintes">
+    ```python
+    from typing import Annotated
+    from pydantic import Field
+
+    def calculer_surface(
+        longueur: Annotated[float, Field(ge=0, le=1000)],
+        largeur: Annotated[float, Field(ge=0, le=1000)]
+    ) -> float:
+        """Calcule la surface d'un rectangle."""
+        return longueur * largeur
+    ```
+
+    ✅ Génère automatiquement :
+    - Type : `number`
+    - Contraintes : minimum 0, maximum 1000
+    - Validation : MecaPy rejette les valeurs hors limites
+  </Accordion>
+
+  <Accordion title="Retour structuré avec TypedDict">
+    ```python
+    from typing import TypedDict, Literal
+
+    class InfoVis(TypedDict):
+        diametre: float
+        classe: Literal["4.6", "5.6", "8.8", "10.9", "12.9"]
+        materiau: Literal["acier", "inox"]
+        precharge_recommandee: float
+
+    def info_vis(designation: str) -> InfoVis:
+        """Retourne les infos d'une vis."""
+        diametre = int(designation[1:])
+        return {
+            "diametre": diametre,
+            "classe": "8.8",
+            "materiau": "acier",
+            "precharge_recommandee": diametre * 100
+        }
+    ```
+
+    ✅ Génère un schema objet avec :
+    - Propriétés typées
+    - Enums pour `classe` et `materiau`
+    - Tous les champs requis
+  </Accordion>
+
+  <Accordion title="Validation de pattern string">
+    ```python
+    from typing import Annotated
+    from pydantic import Field
+
+    def decoder_reference(
+        reference: Annotated[str, Field(
+            pattern="^VIS-[A-Z]{2}-[0-9]{4}$",
+            examples=["VIS-AC-0812", "VIS-IN-1016"]
+        )]
+    ) -> dict:
+        """Décode une référence de vis."""
+        parts = reference.split("-")
+        return {
+            "type": parts[0],
+            "materiau": parts[1],
+            "dimensions": parts[2]
+        }
+    ```
+
+    ✅ Génère :
+    - Type : `string`
+    - Pattern regex : validation automatique
+    - Exemples : pour la documentation
+  </Accordion>
+</AccordionGroup>
+
+## Checklist
+
+<Steps>
+  <Step title="Type hints sur tous les paramètres">
+    `def func(x: float, y: str) -> dict:`
+  </Step>
+  <Step title="Pydantic Field pour les contraintes">
+    `Annotated[float, Field(ge=0, le=100)]`
+  </Step>
+  <Step title="TypedDict pour retours structurés">
+    `class Result(TypedDict): ...`
+  </Step>
+  <Step title="Docstrings NumPy pour descriptions">
+    Format NumPy avec sections Parameters/Returns
+  </Step>
+</Steps>
+
+## Prochaines étapes
+
+<CardGroup cols={2}>
+  <Card
+    title="Exemples complets"
+    icon="code"
+    href="/manifest/examples"
+  >
+    Voir des cas d'usage réels avec auto-introspection
+  </Card>
+  <Card
+    title="Syntaxe du manifest"
+    icon="file-code"
+    href="/manifest/syntax"
+  >
+    Référence complète du fichier mecapy.yml
+  </Card>
+</CardGroup>

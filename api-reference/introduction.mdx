@@ -1,33 +1,128 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: 'API Reference'
+description: 'Documentation complète de l\'API REST MecaPy'
 ---
 
+## Introduction
+
+L'API MecaPy permet de déployer et d'exécuter vos fonctions Python via des endpoints REST.
+
 <Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
+  **Base URL** : `https://api.mecapy.com`
 </Note>
 
-## Welcome
+## Authentification
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+Toutes les requêtes nécessitent un **Bearer token**.
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
-
-## Authentication
-
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
-
-```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+```bash
+Authorization: Bearer YOUR_API_KEY
 ```
+
+Obtenez votre API key depuis le [dashboard](https://app.mecapy.com/settings/api-keys).
+
+## Endpoints principaux
+
+<CardGroup cols={2}>
+  <Card
+    title="Déployer un package"
+    icon="rocket"
+  >
+    `POST /packages/from-git`
+  </Card>
+  <Card
+    title="Exécuter une fonction"
+    icon="play"
+  >
+    `POST /functions/{function_id}/invoke`
+  </Card>
+  <Card
+    title="Lister les packages"
+    icon="list"
+  >
+    `GET /packages`
+  </Card>
+  <Card
+    title="Lister les fonctions"
+    icon="code"
+  >
+    `GET /functions`
+  </Card>
+</CardGroup>
+
+## Exemple rapide
+
+### Déployer un package
+
+```bash
+curl -X POST https://api.mecapy.com/packages/from-git \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "git_url": "https://github.com/votre-username/votre-repo",
+    "git_ref": "main"
+  }'
+```
+
+### Exécuter une fonction
+
+```bash
+curl -X POST https://api.mecapy.com/functions/mon-package/ma-fonction/1.0.0/invoke \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "param1": "valeur1",
+    "param2": 42
+  }'
+```
+
+## SDK Python
+
+Utilisez le SDK Python officiel pour simplifier vos appels :
+
+```bash
+pip install mecapy-sdk
+```
+
+```python
+from mecapy import MecaPy
+
+client = MecaPy(api_key="YOUR_API_KEY")
+
+# Déployer un package
+package = client.deploy_from_git(
+    git_url="https://github.com/votre-username/votre-repo",
+    git_ref="main"
+)
+
+# Exécuter une fonction
+result = client.invoke(
+    function_id="mon-package/ma-fonction/1.0.0",
+    inputs={"param1": "valeur1", "param2": 42}
+)
+
+print(result)
+```
+
+<Info>
+  La documentation complète de l'API sera disponible prochainement.
+</Info>
+
+## Support
+
+<CardGroup cols={2}>
+  <Card
+    title="Documentation"
+    icon="book"
+    href="/"
+  >
+    Retour à la documentation
+  </Card>
+  <Card
+    title="Support"
+    icon="life-ring"
+    href="mailto:support@mecapy.com"
+  >
+    Contactez le support
+  </Card>
+</CardGroup>
