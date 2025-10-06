@@ -1,0 +1,136 @@
+---
+title: Introduction
+description: 'Bienvenue dans la documentation MecaPy'
+---
+
+<img
+  className="block dark:hidden"
+  src="/images/hero-light.svg"
+  alt="Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/hero-dark.svg"
+  alt="Hero Dark"
+/>
+
+## Qu'est-ce que MecaPy ?
+
+MecaPy est une plateforme serverless pour déployer et exécuter des fonctions Python d'ingénierie et de calcul scientifique.
+
+<CardGroup cols={2}>
+  <Card
+    title="Déploiement simple"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Déployez vos fonctions Python en quelques minutes
+  </Card>
+  <Card
+    title="Auto-introspection"
+    icon="wand-magic-sparkles"
+    href="/manifest/schemas"
+  >
+    Schemas générés automatiquement depuis vos type hints
+  </Card>
+  <Card
+    title="Configuration minimale"
+    icon="file-code"
+    href="/manifest/syntax"
+  >
+    Un simple fichier `mecapy.yml` suffit
+  </Card>
+  <Card
+    title="API REST"
+    icon="code"
+    href="/api-reference/introduction"
+  >
+    Appelez vos fonctions via API REST
+  </Card>
+</CardGroup>
+
+## Caractéristiques principales
+
+<AccordionGroup>
+  <Accordion icon="file-code" title="Format manifest simple">
+    Un seul fichier `mecapy.yml` à la racine de votre projet. Les schemas d'entrée/sortie sont générés automatiquement depuis vos type hints Python.
+  </Accordion>
+
+  <Accordion icon="github" title="Déploiement Git">
+    Déployez directement depuis GitHub, GitLab ou Bitbucket. Versioning automatique basé sur le code source.
+  </Accordion>
+
+  <Accordion icon="shield-check" title="Validation automatique">
+    Validation des entrées/sorties basée sur JSON Schema. Sécurité et isolation des exécutions.
+  </Accordion>
+
+  <Accordion icon="gauge-high" title="Exécution serverless">
+    Scaling automatique, pas de serveur à gérer. Payez uniquement pour ce que vous utilisez.
+  </Accordion>
+</AccordionGroup>
+
+## Premiers pas
+
+<Steps>
+  <Step title="Créer un fichier mecapy.yml">
+    Définissez vos fonctions dans un fichier de configuration simple
+  </Step>
+  <Step title="Ajouter vos type hints">
+    Annotez vos fonctions Python avec des type hints pour la génération automatique de schemas
+  </Step>
+  <Step title="Déployer via Git">
+    Poussez votre code sur Git et déployez via l'API MecaPy
+  </Step>
+  <Step title="Appeler vos fonctions">
+    Utilisez l'API REST pour exécuter vos fonctions
+  </Step>
+</Steps>
+
+## Exemple rapide
+
+```yaml mecapy.yml
+name: mon-package
+description: Package de calculs mécaniques
+
+functions:
+  calcul-contrainte:
+    handler: calculs.Vis:calculer_contrainte
+    init: [diametre, materiau]
+```
+
+```python calculs.py
+class Vis:
+    def __init__(self, diametre: float, materiau: str):
+        self.diametre = diametre
+        self.materiau = materiau
+
+    def calculer_contrainte(self, force: float) -> dict:
+        """Calcule la contrainte de traction."""
+        return {
+            "contrainte": force / (3.14 * (self.diametre/2)**2),
+            "unite": "MPa"
+        }
+```
+
+<Note>
+  Les schemas d'entrée/sortie sont **automatiquement générés** depuis vos type hints !
+</Note>
+
+## Support
+
+<CardGroup cols={2}>
+  <Card
+    title="Documentation"
+    icon="book"
+    href="/manifest/overview"
+  >
+    Consultez notre documentation complète
+  </Card>
+  <Card
+    title="Support"
+    icon="life-ring"
+    href="mailto:support@mecapy.com"
+  >
+    Contactez notre équipe support
+  </Card>
+</CardGroup>

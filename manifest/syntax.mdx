@@ -1,0 +1,392 @@
+---
+title: 'Syntaxe'
+description: 'Référence complète du fichier mecapy.yml'
+---
+
+## Structure du fichier
+
+```yaml mecapy.yml
+name: nom-package
+description: Description
+author: Nom Auteur
+license: MIT
+tags:
+  - tag1
+  - tag2
+
+functions:
+  nom-fonction:
+    handler: module:function
+    description: Description fonction
+    init: [param1, param2]
+
+runtime:
+  python: "3.12"
+  timeout: 300
+  memory: 2048
+
+tests:
+  framework: pytest
+  min_coverage: 80
+```
+
+## Champs Package
+
+### name (requis)
+
+Nom unique de votre package en **kebab-case**.
+
+```yaml
+name: calculs-mecaniques  # ✅ Bon
+name: calculs_mecaniques  # ❌ Éviter
+name: CalculsMecaniques   # ❌ Éviter
+```
+
+<Warning>
+  Le nom doit être unique sur la plateforme MecaPy.
+</Warning>
+
+### description (optionnel)
+
+Description courte de votre package.
+
+```yaml
+description: Suite de calculs pour assemblages boulonnés selon Eurocode 3
+```
+
+### author (optionnel)
+
+Nom de l'auteur ou de l'organisation.
+
+```yaml
+author: Votre Nom
+# ou
+author: Votre Organisation
+```
+
+### license (optionnel)
+
+Licence du package. Par défaut : `MIT`.
+
+```yaml
+license: MIT
+# ou
+license: Apache-2.0
+# ou
+license: GPL-3.0
+```
+
+### tags (optionnel)
+
+Liste de tags pour catégoriser votre package.
+
+```yaml
+tags:
+  - mécanique
+  - assemblage
+  - eurocode
+  - calcul-structure
+```
+
+## Champs Functions
+
+### handler (requis)
+
+Chemin vers la fonction ou méthode à exposer.
+
+<Tabs>
+  <Tab title="Fonction simple">
+    ```yaml
+    handler: module:function
+    ```
+    Exemple : `calculs:add`
+  </Tab>
+  <Tab title="Méthode d'instance">
+    ```yaml
+    handler: module.Class:method
+    ```
+    Exemple : `vis.Vis:calculer_contrainte`
+  </Tab>
+  <Tab title="Classmethod">
+    ```yaml
+    handler: module.Class:classmethod
+    ```
+    Exemple : `vis.Vis:depuis_designation`
+  </Tab>
+  <Tab title="Classe callable">
+    ```yaml
+    handler: module.Class
+    ```
+    Exemple : `calculator.Calculator`
+  </Tab>
+</Tabs>
+
+<Tip>
+  Consultez la page [Handlers](/manifest/handlers) pour plus de détails.
+</Tip>
+
+### description (optionnel)
+
+Description courte de la fonction.
+
+```yaml
+functions:
+  calcul-contrainte:
+    handler: vis.Vis:calculer_contrainte
+    description: Calcule la contrainte de traction selon RDM
+```
+
+### init (optionnel, méthodes uniquement)
+
+Paramètres du constructeur pour les **méthodes d'instance**.
+
+<Tabs>
+  <Tab title="Format liste (simple)">
+    ```yaml
+    init: [diametre, materiau]
+    ```
+    Équivalent à :
+    ```python
+    Vis(diametre=inputs["diametre"], materiau=inputs["materiau"])
+    ```
+  </Tab>
+  <Tab title="Format mapping (avancé)">
+    ```yaml
+    init:
+      diametre: "{inputs.diametre}"
+      materiau: "{inputs.materiau}"
+      longueur: 100  # Valeur fixe
+    ```
+  </Tab>
+  <Tab title="Avec transformation">
+    ```yaml
+    init:
+      diametre: "{inputs.diametre_mm}"
+      materiau: "get_materiau({inputs.code_materiau})"
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Le paramètre `init` est **uniquement pour les méthodes d'instance**. Pas nécessaire pour les fonctions simples ou classmethods.
+</Note>
+
+### inputs_schema (optionnel, rare)
+
+Override manuel du schema d'entrée. **Rarement nécessaire**, laissez l'auto-introspection faire le travail.
+
+```yaml
+functions:
+  fonction-custom:
+    handler: module:function
+    inputs_schema:
+      type: object
+      properties:
+        code:
+          type: string
+          pattern: "^[A-Z]{3}-[0-9]{4}$"
+      required: [code]
+```
+
+<Warning>
+  N'utilisez `inputs_schema` que si l'auto-introspection ne suffit pas. Dans 90% des cas, les type hints Python suffisent.
+</Warning>
+
+### outputs_schema (optionnel, rare)
+
+Override manuel du schema de sortie.
+
+```yaml
+functions:
+  fonction-custom:
+    handler: module:function
+    outputs_schema:
+      type: object
+      properties:
+        resultat: {type: number}
+        statut: {type: string}
+```
+
+## Configuration Runtime
+
+Configuration d'exécution par défaut pour toutes les fonctions.
+
+```yaml
+runtime:
+  python: "3.12"      # Version Python (3.11, 3.12)
+  timeout: 300        # Timeout en secondes (défaut: 300)
+  memory: 2048        # Mémoire en MB (défaut: 2048)
+```
+
+### Override par fonction
+
+Vous pouvez override le runtime pour une fonction spécifique :
+
+```yaml
+functions:
+  calcul-rapide:
+    handler: module:quick
+    runtime:
+      timeout: 60
+      memory: 512
+
+  calcul-lourd:
+    handler: module:heavy
+    runtime:
+      timeout: 900
+      memory: 8192
+```
+
+## Configuration Tests
+
+Configuration de la validation des tests.
+
+```yaml
+tests:
+  framework: pytest           # Framework (pytest par défaut)
+  min_coverage: 80           # Couverture minimale en %
+  command: "pytest tests/"   # Commande personnalisée (optionnel)
+```
+
+<Info>
+  MecaPy détecte automatiquement les tests dans le dossier `tests/`.
+</Info>
+
+## Exemples complets
+
+<AccordionGroup>
+  <Accordion title="Package minimal">
+    ```yaml
+    name: simple-calc
+    description: Calculateur simple
+
+    functions:
+      add:
+        handler: calculator:add
+    ```
+  </Accordion>
+
+  <Accordion title="Package avec méthodes">
+    ```yaml
+    name: mecapy-vis
+    description: Calculs d'assemblages boulonnés
+
+    functions:
+      contrainte-traction:
+        handler: vis.Vis:calculer_contrainte_traction
+        init: [diametre, materiau]
+
+      cisaillement:
+        handler: vis.Vis:calculer_cisaillement
+        init: [diametre, materiau]
+
+      creation-vis:
+        handler: vis.Vis:depuis_designation
+    ```
+  </Accordion>
+
+  <Accordion title="Package avec runtime custom">
+    ```yaml
+    name: advanced-package
+
+    functions:
+      light-task:
+        handler: tasks:light
+        runtime:
+          timeout: 60
+          memory: 512
+
+      heavy-task:
+        handler: tasks:heavy
+        runtime:
+          timeout: 900
+          memory: 8192
+
+    runtime:
+      python: "3.12"
+      timeout: 300
+      memory: 2048
+    ```
+  </Accordion>
+
+  <Accordion title="Package avec overrides">
+    ```yaml
+    name: custom-validation
+
+    functions:
+      # Fonction normale (auto-introspection)
+      simple:
+        handler: module:simple
+
+      # Fonction avec validation custom
+      complex:
+        handler: module:complex
+        inputs_schema:
+          type: object
+          properties:
+            code:
+              type: string
+              pattern: "^[A-Z]{3}-[0-9]{4}$"
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  key: {type: string}
+                  value: {type: number}
+          required: [code, data]
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Bonnes pratiques
+
+<CardGroup cols={2}>
+  <Card title="Nommage kebab-case" icon="text">
+    Utilisez des tirets pour les noms de packages et fonctions
+  </Card>
+  <Card title="Type hints complets" icon="code">
+    Annotez toutes vos fonctions pour l'auto-introspection
+  </Card>
+  <Card title="Docstrings NumPy" icon="file-lines">
+    Documentez avec le format NumPy pour les descriptions
+  </Card>
+  <Card title="Tests" icon="vial">
+    Incluez des tests dans le dossier `tests/`
+  </Card>
+</CardGroup>
+
+## Validation
+
+### Checklist
+
+- [ ] `name` est unique et en kebab-case
+- [ ] Tous les `handler` sont valides
+- [ ] Les `init` correspondent aux constructeurs
+- [ ] Type hints présents sur toutes les fonctions
+- [ ] Docstrings NumPy sur toutes les fonctions
+- [ ] Tests présents dans `tests/`
+- [ ] `requirements.txt` ou `pyproject.toml` à jour
+
+<Tip>
+  MecaPy valide automatiquement votre manifest au déploiement et vous signale les erreurs.
+</Tip>
+
+## Prochaines étapes
+
+<CardGroup cols={2}>
+  <Card
+    title="Types de handlers"
+    icon="link"
+    href="/manifest/handlers"
+  >
+    Fonctions, méthodes, classmethods en détail
+  </Card>
+  <Card
+    title="Auto-introspection"
+    icon="wand-magic-sparkles"
+    href="/manifest/schemas"
+  >
+    Comment fonctionnent les schemas auto-générés
+  </Card>
+</CardGroup>

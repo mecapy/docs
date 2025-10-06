@@ -1,0 +1,80 @@
+{
+  "name": "MecaPy",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373",
+    "anchors": {
+      "from": "#0D9373",
+      "to": "#07C983"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Support",
+      "url": "mailto:support@mecapy.com"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Dashboard",
+    "url": "https://app.mecapy.com"
+  },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "Documentation",
+      "icon": "book-open-cover",
+      "url": "https://docs.mecapy.com"
+    },
+    {
+      "name": "Community",
+      "icon": "discord",
+      "url": "https://discord.gg/mecapy"
+    },
+    {
+      "name": "Blog",
+      "icon": "newspaper",
+      "url": "https://mecapy.com/blog"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Démarrage",
+      "pages": [
+        "introduction",
+        "quickstart"
+      ]
+    },
+    {
+      "group": "Configuration",
+      "pages": [
+        "manifest/overview",
+        "manifest/syntax",
+        "manifest/handlers",
+        "manifest/schemas",
+        "manifest/examples"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/introduction"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "twitter": "https://twitter.com/mecapy",
+    "github": "https://github.com/mecapy",
+    "linkedin": "https://www.linkedin.com/company/mecapy"
+  }
+}

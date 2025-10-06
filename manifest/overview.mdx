@@ -1,0 +1,239 @@
+---
+title: 'Vue d\'ensemble'
+description: 'Le fichier mecapy.yml configure votre package'
+---
+
+## Qu'est-ce que le manifest ?
+
+Le manifest `mecapy.yml` est le fichier de configuration qui définit votre package MecaPy. Il se place à la racine de votre projet Git.
+
+<Note>
+  **Philosophie** : Simple par défaut, flexible quand nécessaire.
+</Note>
+
+## Structure minimale
+
+```yaml mecapy.yml
+name: mon-package
+description: Description de mon package
+
+functions:
+  ma-fonction:
+    handler: module:function
+```
+
+C'est tout ! Les schemas sont auto-générés depuis vos type hints Python.
+
+## Principes de base
+
+<CardGroup cols={2}>
+  <Card title="Auto-introspection" icon="wand-magic-sparkles">
+    90% des cas : Les schemas sont générés automatiquement
+  </Card>
+  <Card title="Overrides optionnels" icon="sliders">
+    10% des cas : Vous pouvez surcharger les schemas si nécessaire
+  </Card>
+  <Card title="Un seul fichier" icon="file">
+    Tout est dans `mecapy.yml`, pas de configuration dispersée
+  </Card>
+  <Card title="Type hints requis" icon="code">
+    Annotez vos fonctions Python pour l'auto-génération
+  </Card>
+</CardGroup>
+
+## Workflow
+
+<Steps>
+  <Step title="Écrire votre code Python">
+    Avec type hints et docstrings NumPy
+  </Step>
+  <Step title="Créer mecapy.yml">
+    Définir le nom du package et les handlers
+  </Step>
+  <Step title="Pousser sur Git">
+    Commit et push vers GitHub/GitLab/Bitbucket
+  </Step>
+  <Step title="Déployer via API">
+    MecaPy clone, analyse et déploie automatiquement
+  </Step>
+</Steps>
+
+## Exemple complet
+
+<CodeGroup>
+
+```yaml mecapy.yml
+name: calculs-mecaniques
+description: Suite de calculs pour assemblages boulonnés
+author: Votre Nom
+license: MIT
+tags:
+  - mécanique
+  - assemblage
+
+functions:
+  # Fonction simple
+  addition:
+    handler: calculs:add
+    description: Additionne deux nombres
+
+  # Méthode de classe avec constructeur
+  calcul-contrainte:
+    handler: vis.Vis:calculer_contrainte
+    description: Calcul de contrainte dans une vis
+    init: [diametre, materiau]
+
+  # Classmethod (pas besoin de init)
+  creation-vis:
+    handler: vis.Vis:depuis_designation
+    description: Créer une vis depuis sa désignation
+
+# Configuration optionnelle
+runtime:
+  python: "3.12"
+  timeout: 300
+
+tests:
+  framework: pytest
+  min_coverage: 80
+```
+
+```python calculs.py
+def add(x: float, y: float) -> float:
+    """Additionne deux nombres."""
+    return x + y
+```
+
+```python vis.py
+class Vis:
+    def __init__(self, diametre: float, materiau: str):
+        self.diametre = diametre
+        self.materiau = materiau
+
+    def calculer_contrainte(self, force: float) -> dict:
+        """
+        Calcule la contrainte de traction.
+
+        Parameters
+        ----------
+        force : float
+            Force appliquée en Newton
+
+        Returns
+        -------
+        dict
+            Résultat avec contrainte et unité
+        """
+        aire = 3.14 * (self.diametre / 2) ** 2
+        return {
+            "contrainte": force / aire,
+            "unite": "MPa"
+        }
+
+    @classmethod
+    def depuis_designation(cls, designation: str) -> "Vis":
+        """Crée une vis depuis sa désignation (M8, M12, etc.)."""
+        diametre = int(designation[1:])
+        return cls(diametre, "acier")
+```
+
+</CodeGroup>
+
+## Champs disponibles
+
+### Package (requis)
+
+| Champ | Type | Requis | Description |
+|-------|------|--------|-------------|
+| `name` | string | ✅ | Nom unique du package (kebab-case) |
+| `description` | string | ❌ | Description du package |
+| `author` | string | ❌ | Auteur du package |
+| `license` | string | ❌ | Licence (MIT, Apache-2.0, etc.) |
+| `tags` | array | ❌ | Tags pour catégorisation |
+
+### Functions (requis)
+
+| Champ | Type | Requis | Description |
+|-------|------|--------|-------------|
+| `handler` | string | ✅ | Chemin vers la fonction/méthode |
+| `description` | string | ❌ | Description de la fonction |
+| `init` | list/object | ❌ | Paramètres du constructeur (méthodes) |
+| `inputs_schema` | object | ❌ | Override schema d'entrée (rare) |
+| `outputs_schema` | object | ❌ | Override schema de sortie (rare) |
+
+<Warning>
+  Les champs `inputs_schema` et `outputs_schema` sont rarement nécessaires. Laissez MecaPy les générer automatiquement !
+</Warning>
+
+### Runtime (optionnel)
+
+```yaml
+runtime:
+  python: "3.12"      # Version Python (3.11, 3.12)
+  timeout: 300        # Timeout en secondes
+  memory: 2048        # Mémoire en MB
+```
+
+### Tests (optionnel)
+
+```yaml
+tests:
+  framework: pytest   # Framework de test
+  min_coverage: 80    # Couverture minimale (%)
+```
+
+## Auto-introspection
+
+MecaPy génère automatiquement :
+
+<Steps>
+  <Step title="Input schemas">
+    Depuis les **type hints** et **Pydantic Field**
+  </Step>
+  <Step title="Output schemas">
+    Depuis les **TypedDict** et type hints de retour
+  </Step>
+  <Step title="Descriptions">
+    Depuis les **docstrings NumPy**
+  </Step>
+  <Step title="Validation">
+    Depuis les **contraintes Pydantic** (ge, le, pattern, etc.)
+  </Step>
+</Steps>
+
+<Tip>
+  Consultez la page [Schemas](/manifest/schemas) pour comprendre l'auto-introspection en détail.
+</Tip>
+
+## Prochaines étapes
+
+<CardGroup cols={2}>
+  <Card
+    title="Syntaxe complète"
+    icon="file-code"
+    href="/manifest/syntax"
+  >
+    Tous les champs et options disponibles
+  </Card>
+  <Card
+    title="Types de handlers"
+    icon="link"
+    href="/manifest/handlers"
+  >
+    Fonctions, méthodes, classmethods...
+  </Card>
+  <Card
+    title="Auto-introspection"
+    icon="wand-magic-sparkles"
+    href="/manifest/schemas"
+  >
+    Comment fonctionnent les schemas auto-générés
+  </Card>
+  <Card
+    title="Exemples"
+    icon="code"
+    href="/manifest/examples"
+  >
+    Cas d'usage complets
+  </Card>
+</CardGroup>

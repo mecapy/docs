@@ -1,0 +1,201 @@
+---
+title: 'Démarrage rapide'
+description: 'Déployez votre première fonction MecaPy en 5 minutes'
+---
+
+## Prérequis
+
+<CardGroup cols={2}>
+  <Card title="Python 3.11+" icon="python">
+    Version Python 3.11 ou supérieure
+  </Card>
+  <Card title="Repository Git" icon="github">
+    Code hébergé sur GitHub, GitLab ou Bitbucket
+  </Card>
+</CardGroup>
+
+## Étape 1 : Créer le manifest
+
+Créez un fichier `mecapy.yml` à la racine de votre projet :
+
+```yaml mecapy.yml
+name: mon-premier-package
+description: Mon premier package MecaPy
+
+functions:
+  addition:
+    handler: calculs:add
+```
+
+<Tip>
+  C'est tout ! Les schemas sont auto-générés depuis vos type hints.
+</Tip>
+
+## Étape 2 : Créer votre fonction Python
+
+Créez votre fichier Python avec des **type hints** :
+
+```python calculs.py
+def add(x: float, y: float) -> float:
+    """Additionne deux nombres."""
+    return x + y
+```
+
+<Note>
+  Les type hints (`x: float`, `y: float`, `-> float`) permettent à MecaPy de générer automatiquement les schemas de validation.
+</Note>
+
+## Étape 3 : Déployer
+
+Déployez via l'API MecaPy :
+
+```bash
+curl -X POST https://api.mecapy.com/packages/from-git \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "git_url": "https://github.com/votre-username/votre-repo",
+    "git_ref": "main"
+  }'
+```
+
+<Tip>
+  Vous pouvez aussi déployer depuis l'interface web : [app.mecapy.com](https://app.mecapy.com)
+</Tip>
+
+## Étape 4 : Appeler votre fonction
+
+```bash
+curl -X POST https://api.mecapy.com/functions/addition/invoke \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "x": 10,
+    "y": 5
+  }'
+```
+
+Réponse :
+```json
+{
+  "result": 15.0,
+  "execution_time_ms": 12,
+  "function_id": "mon-premier-package/addition/1.0.0"
+}
+```
+
+## Exemples avancés
+
+<AccordionGroup>
+  <Accordion title="Fonction avec validation">
+    ```python
+    from typing import Annotated
+    from pydantic import Field
+
+    def calcul(
+        force: Annotated[float, Field(
+            description="Force en Newton",
+            ge=0,
+            le=500000
+        )],
+        diametre: Annotated[float, Field(
+            description="Diamètre en mm",
+            ge=3,
+            le=100
+        )]
+    ) -> float:
+        """Calcule la contrainte."""
+        return force / (3.14 * (diametre/2)**2)
+    ```
+
+    Les contraintes `ge` (greater or equal) et `le` (less or equal) sont automatiquement validées !
+  </Accordion>
+
+  <Accordion title="Méthode de classe">
+    ```yaml mecapy.yml
+    functions:
+      calcul-contrainte:
+        handler: vis.Vis:calculer_contrainte
+        init: [diametre, materiau]
+    ```
+
+    ```python vis.py
+    class Vis:
+        def __init__(self, diametre: float, materiau: str):
+            self.diametre = diametre
+            self.materiau = materiau
+
+        def calculer_contrainte(self, force: float) -> dict:
+            return {
+                "contrainte": force / (3.14 * (self.diametre/2)**2),
+                "unite": "MPa"
+            }
+    ```
+
+    Le paramètre `init` permet de passer les paramètres au constructeur.
+  </Accordion>
+
+  <Accordion title="Retour structuré avec TypedDict">
+    ```python
+    from typing import TypedDict, Literal
+
+    class Resultat(TypedDict):
+        contrainte: float
+        statut: Literal["OK", "LIMITE", "RUPTURE"]
+        coefficient_securite: float
+
+    def analyser(force: float, resistance: float) -> Resultat:
+        """Analyse structurelle."""
+        contrainte = force / resistance
+        coef = resistance / force
+
+        if coef >= 2:
+            statut = "OK"
+        elif coef >= 1.5:
+            statut = "LIMITE"
+        else:
+            statut = "RUPTURE"
+
+        return {
+            "contrainte": contrainte,
+            "statut": statut,
+            "coefficient_securite": coef
+        }
+    ```
+
+    Le schema de sortie est automatiquement généré depuis `TypedDict` !
+  </Accordion>
+</AccordionGroup>
+
+## Prochaines étapes
+
+<CardGroup cols={2}>
+  <Card
+    title="Syntaxe du manifest"
+    icon="file-code"
+    href="/manifest/syntax"
+  >
+    Découvrez toutes les options du fichier mecapy.yml
+  </Card>
+  <Card
+    title="Handlers"
+    icon="link"
+    href="/manifest/handlers"
+  >
+    Fonctions, méthodes, classmethods... tous les types supportés
+  </Card>
+  <Card
+    title="Schemas"
+    icon="wand-magic-sparkles"
+    href="/manifest/schemas"
+  >
+    Comment fonctionne l'auto-introspection
+  </Card>
+  <Card
+    title="Exemples"
+    icon="code"
+    href="/manifest/examples"
+  >
+    Exemples complets et cas d'usage
+  </Card>
+</CardGroup>
