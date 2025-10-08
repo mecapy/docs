@@ -13,32 +13,13 @@ tasks:
     status:
       - command -v mintlify
 
-  install:local:
-    desc: "Install Mintlify locally for this docs repo"
-    cmds:
-      - npm install mintlify@{{.MINTLIFY_VERSION}} --save-dev
-      - npm install
-
   # Development server
-  dev:
+  preview:
     desc: "Start Mintlify development server"
     cmds:
       - mintlify dev
     deps:
       - install
-
-  dev:port:
-    desc: "Start dev server on custom port (usage: task dev:port PORT=3001)"
-    cmds:
-      - mintlify dev --port {{.PORT}}
-    deps:
-      - install
-
-  # Preview and build
-  preview:
-    desc: "Preview documentation (same as dev)"
-    cmds:
-      - task: dev
 
   build:
     desc: "Build documentation for production"
@@ -47,149 +28,12 @@ tasks:
     deps:
       - install
 
-  # Validation
-  validate:
-    desc: "Validate mint.json configuration"
-    cmds:
-      - |
-        if [ -f mint.json ]; then
-          echo "✅ mint.json found"
-          cat mint.json | python3 -m json.tool > /dev/null && echo "✅ Valid JSON" || echo "❌ Invalid JSON"
-        else
-          echo "❌ mint.json not found"
-          exit 1
-        fi
-
   check:
     desc: "Check documentation for broken links and errors"
     cmds:
       - mintlify broken-links
     deps:
       - install
-
-  # Initialization
-  init:
-    desc: "Initialize Mintlify documentation structure"
-    cmds:
-      - |
-        if [ ! -f mint.json ]; then
-          echo "📝 Creating mint.json configuration..."
-          task init:config
-        else
-          echo "✅ mint.json already exists"
-        fi
-      - echo "✅ Documentation initialized"
-
-  init:config:
-    desc: "Create initial mint.json configuration"
-    cmds:
-      - |
-        cat > mint.json <<'EOF'
-        {
-          "$schema": "https://mintlify.com/schema.json",
-          "name": "MecaPy Documentation",
-          "logo": {
-            "dark": "/logo/dark.svg",
-            "light": "/logo/light.svg"
-          },
-          "favicon": "/favicon.svg",
-          "colors": {
-            "primary": "#0D9373",
-            "light": "#07C983",
-            "dark": "#0D9373",
-            "anchors": {
-              "from": "#0D9373",
-              "to": "#07C983"
-            }
-          },
-          "topbarLinks": [
-            {
-              "name": "Support",
-              "url": "mailto:support@mecapy.com"
-            }
-          ],
-          "topbarCtaButton": {
-            "name": "Dashboard",
-            "url": "https://app.mecapy.com"
-          },
-          "tabs": [
-            {
-              "name": "API Reference",
-              "url": "api-reference"
-            },
-            {
-              "name": "Guides",
-              "url": "guides"
-            }
-          ],
-          "anchors": [
-            {
-              "name": "Documentation",
-              "icon": "book-open-cover",
-              "url": "https://docs.mecapy.com"
-            },
-            {
-              "name": "Community",
-              "icon": "discord",
-              "url": "https://discord.gg/mecapy"
-            },
-            {
-              "name": "GitHub",
-              "icon": "github",
-              "url": "https://github.com/mecapy"
-            }
-          ],
-          "navigation": [
-            {
-              "group": "Get Started",
-              "pages": [
-                "QUICKSTART",
-                "architecture"
-              ]
-            },
-            {
-              "group": "Package Development",
-              "pages": [
-                "MANIFEST_FORMAT",
-                "STANDARD_TYPES_GUIDE",
-                "PACKAGE_MULTI_FUNCTIONS",
-                "VERSIONING_STRATEGY"
-              ]
-            },
-            {
-              "group": "Architecture",
-              "pages": [
-                "architecture_finale_sans_limite",
-                "architecture_serverless_simple",
-                "execution_securisee_analyse"
-              ]
-            },
-            {
-              "group": "CI/CD & Deployment",
-              "pages": [
-                "container_registry_strategy",
-                "registry_cicd_workflow",
-                "deployment"
-              ]
-            },
-            {
-              "group": "API Reference",
-              "pages": [
-                "api-reference/introduction",
-                "api-reference/authentication",
-                "api-reference/endpoints"
-              ]
-            }
-          ],
-          "footerSocials": {
-            "github": "https://github.com/mecapy",
-            "linkedin": "https://www.linkedin.com/company/mecapy"
-          }
-        }
-        EOF
-        echo "✅ mint.json created"
-    status:
-      - test -f mint.json
 
   # Cleanup
   clean:
@@ -200,36 +44,8 @@ tasks:
       - rm -f package-lock.json
       - echo "✅ Cleaned build artifacts"
 
-  # Help and info
-  info:
-    desc: "Show Mintlify version and documentation info"
-    cmds:
-      - echo "📚 MecaPy Documentation"
-      - echo ""
-      - mintlify --version
-      - echo ""
-      - |
-        if [ -f mint.json ]; then
-          echo "✅ Configuration: mint.json found"
-        else
-          echo "❌ Configuration: mint.json missing (run: task init)"
-        fi
-      - echo ""
-      - echo "📖 Available commands:"
-      - echo "  task dev         - Start development server"
-      - echo "  task build       - Build for production"
-      - echo "  task validate    - Validate configuration"
-      - echo "  task check       - Check for broken links"
-
   # Default task
   default:
     desc: "Show available tasks"
     cmds:
       - task --list
-
-  # Quick start
-  start:
-    desc: "Quick start: initialize and start dev server"
-    cmds:
-      - task: init
-      - task: dev
