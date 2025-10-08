@@ -1,5 +1,6 @@
 {
-  "name": "MecaPy",
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "MecaPy Documentation",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
@@ -26,54 +27,84 @@
   },
   "tabs": [
     {
+      "name": "Package Development",
+      "url": "packages"
+    },
+    {
+      "name": "Architecture",
+      "url": "architecture"
+    },
+    {
       "name": "API Reference",
       "url": "api-reference"
     }
   ],
   "anchors": [
     {
-      "name": "Documentation",
-      "icon": "book-open-cover",
-      "url": "https://docs.mecapy.com"
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/mecapy"
     },
     {
       "name": "Community",
       "icon": "discord",
       "url": "https://discord.gg/mecapy"
-    },
-    {
-      "name": "Blog",
-      "icon": "newspaper",
-      "url": "https://mecapy.com/blog"
     }
   ],
   "navigation": [
     {
-      "group": "Démarrage",
+      "group": "Get Started",
       "pages": [
         "introduction",
-        "quickstart"
+        "QUICKSTART",
+        "architecture"
       ]
     },
     {
-      "group": "Configuration",
+      "group": "Package Development",
       "pages": [
-        "manifest/overview",
-        "manifest/syntax",
-        "manifest/handlers",
-        "manifest/schemas",
-        "manifest/examples"
+        "packages/MANIFEST_FORMAT",
+        "packages/STANDARD_TYPES_GUIDE",
+        "packages/PACKAGE_MULTI_FUNCTIONS",
+        "packages/VERSIONING_STRATEGY",
+        "packages/VERSIONING_REFINED"
+      ]
+    },
+    {
+      "group": "Architecture",
+      "pages": [
+        "architecture/architecture_finale_sans_limite",
+        "architecture/architecture_serverless_simple",
+        "architecture/architecture_plan_mecapy",
+        "architecture/execution_securisee_analyse",
+        "architecture/firecracker_faisabilite"
+      ]
+    },
+    {
+      "group": "CI/CD & Deployment",
+      "pages": [
+        "ci-cd/container_registry_strategy",
+        "ci-cd/registry_cicd_workflow",
+        "deployment"
       ]
     },
     {
       "group": "API Reference",
       "pages": [
-        "api-reference/introduction"
+        "api-reference/api-specifications",
+        "api-reference/authentication-providers",
+        "api-reference/database-schema"
+      ]
+    },
+    {
+      "group": "Development",
+      "pages": [
+        "git-workflow",
+        "keycloak"
       ]
     }
   ],
   "footerSocials": {
-    "twitter": "https://twitter.com/mecapy",
     "github": "https://github.com/mecapy",
     "linkedin": "https://www.linkedin.com/company/mecapy"
   }
