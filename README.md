@@ -188,20 +188,7 @@ function calculate(force) {
 
 ### Example: API Endpoint
 
-```markdown
-<ResponseExample>
-
-```json Response
-{
-  "status": "success",
-  "data": {
-    "result": 42
-  }
-}
-```
-
-</ResponseExample>
-```
+Mintlify provides the `ResponseExample` component to display API responses with syntax highlighting. Wrap your JSON response in this component for a clean presentation in the documentation.
 
 ## Deployment
 

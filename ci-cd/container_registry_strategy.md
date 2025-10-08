@@ -30,7 +30,7 @@ This document outlines the container registry strategy for MecaPy, a scientific 
 | **Private Registry** | Critical | User function code must remain confidential |
 | **Image Vulnerability Scanning** | High | Security requirement for user-generated code |
 | **High Availability** | High | 99.9% uptime SLA needed for production |
-| **Fast Pull Speed** | High | Minimize cold start latency (target: <3s) |
+| **Fast Pull Speed** | High | Minimize cold start latency (target: less than 3s) |
 | **CI/CD Integration** | Medium | Automated builds from API |
 | **Multi-Region Support** | Low | MVP targets single region (EU-West) |
 | **Image Immutability** | Medium | Prevent accidental overwrites |
@@ -38,8 +38,8 @@ This document outlines the container registry strategy for MecaPy, a scientific 
 ### 1.2 Non-Functional Requirements
 
 **Performance:**
-- Image pull latency: <500ms (cached), <2s (cold)
-- Build and push time: <60s for typical function (100MB)
+- Image pull latency: less than 500ms (cached), less than 2s (cold)
+- Build and push time: less than 60s for typical function (100MB)
 - Concurrent pulls: Support 50+ simultaneous worker pulls
 
 **Security:**
@@ -55,7 +55,7 @@ This document outlines the container registry strategy for MecaPy, a scientific 
 - Image count: 100 → 10,000 images
 
 **Cost:**
-- Target: <€50/month at scale (Phase 2)
+- Target: less than 50 EUR/month at scale (Phase 2)
 - MVP: Leverage free tiers where possible
 
 ---
@@ -824,7 +824,7 @@ def backup_registry_metadata():
 
 **Recovery Procedure:**
 
-1. **Minor Outage (<1 hour):** Worker retries + fallback to GHCR
+1. **Minor Outage (less than 1 hour):** Worker retries + fallback to GHCR
 2. **Major Outage (>1 hour):**
    - Switch all workers to GHCR as primary
    - Continue operations with mirrored images
@@ -1013,8 +1013,8 @@ CMD ["python", "user_function.py"]
 ```
 
 **Size Targets:**
-- Base images: <100MB
-- Function images: <300MB
+- Base images: less than 100MB
+- Function images: less than 300MB
 - Maximum allowed: 2GB (enforce in API validation)
 
 ### 9.2 Layer Caching Strategy
@@ -1101,8 +1101,8 @@ def prewarm_image_cache():
 - Documentation in `/docs/registry-setup.md`
 
 **Success Criteria:**
-- Build time: <60s for 100MB image
-- Pull time: <2s from worker (warm cache)
+- Build time: less than 60s for 100MB image
+- Pull time: less than 2s from worker (warm cache)
 - Zero cost (within free tier)
 
 ---
@@ -1132,7 +1132,7 @@ def prewarm_image_cache():
 **Tasks:**
 
 - [ ] Implement image signing with Cosign
-- [ ] Optimize base image sizes (<100MB target)
+- [ ] Optimize base image sizes (less than 100MB target)
 - [ ] Pre-warm cache on worker startup
 - [ ] Implement parallel image pulls
 - [ ] Set up automated mirroring to GHCR (top 100 images)
@@ -1140,7 +1140,7 @@ def prewarm_image_cache():
 - [ ] Implement retention policies automation
 
 **Deliverables:**
-- Cold start latency: <3s (target: 2.5s)
+- Cold start latency: less than 3s (target: 2.5s)
 - Cache hit rate: >80%
 - Build throughput: 50 images/hour
 
