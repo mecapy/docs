@@ -1,0 +1,61 @@
+---
+title: "Login"
+api: "POST /auth/login"
+description: "Authenticate and obtain access token"
+---
+
+Authenticate with username and password to obtain a JWT access token.
+
+<Note>
+  This endpoint uses Keycloak OAuth2 with PKCE support.
+</Note>
+
+## Request Body
+
+<ParamField body="username" type="string" required>
+  User email or username
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  User password
+</ParamField>
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.mecapy.com/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "user@example.com",
+    "password": "your_password"
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://api.mecapy.com/auth/login",
+    json={
+        "username": "user@example.com",
+        "password": "your_password"
+    }
+)
+
+token = response.json()["access_token"]
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+</ResponseExample>

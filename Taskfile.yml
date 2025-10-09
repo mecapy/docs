@@ -35,6 +35,16 @@ tasks:
     deps:
       - install
 
+  # OpenAPI generation
+  openapi:
+    desc: "Regenerate OpenAPI specification from API code"
+    dir: ../api
+    cmds:
+      - .venv/bin/python generate_openapi.py
+      - cp openapi.json ../docs/openapi.json
+      - cp openapi.yaml ../docs/openapi.yaml
+      - echo "✓ OpenAPI specification updated in docs/"
+
   # Cleanup
   clean:
     desc: "Clean build artifacts and cache"

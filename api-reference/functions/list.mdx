@@ -1,0 +1,55 @@
+---
+title: "List Functions"
+api: "GET /functions"
+description: "Get paginated list of all user functions"
+---
+
+Returns a paginated list of all serverless functions deployed by the authenticated user.
+
+## Query Parameters
+
+<ParamField query="page" type="integer" default="1">
+  Page number (starts at 1)
+</ParamField>
+
+<ParamField query="per_page" type="integer" default="20">
+  Items per page (max 100)
+</ParamField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.mecapy.com/functions?page=1&per_page=20 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+response = requests.get(
+    "https://api.mecapy.com/functions",
+    headers={"Authorization": f"Bearer {token}"},
+    params={"page": 1, "per_page": 20}
+)
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success
+{
+  "functions": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "calculate-stress",
+      "status": "ready",
+      "runtime": "python311",
+      "created_at": "2025-01-20T10:30:00Z"
+    }
+  ],
+  "total": 42,
+  "page": 1,
+  "per_page": 20
+}
+```
+
+</ResponseExample>

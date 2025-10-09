@@ -1,0 +1,57 @@
+---
+title: "Get Job Result"
+api: "GET /jobs/{job_id}/result"
+description: "Get execution result of a completed job"
+---
+
+Retrieve the output result from a completed function execution.
+
+## Path Parameters
+
+<ParamField path="job_id" type="string" required>
+  Job ID
+</ParamField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.mecapy.com/jobs/job-abc123/result \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+# Poll for result
+while True:
+    response = requests.get(
+        f"https://api.mecapy.com/jobs/{job_id}",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    
+    if response.json()["status"] == "completed":
+        result = requests.get(
+            f"https://api.mecapy.com/jobs/{job_id}/result",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        break
+    
+    time.sleep(1)
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success
+{
+  "job_id": "job-abc123",
+  "status": "completed",
+  "result": {
+    "stress": 250.5,
+    "unit": "MPa",
+    "status": "OK"
+  },
+  "execution_time_ms": 1250
+}
+```
+
+</ResponseExample>

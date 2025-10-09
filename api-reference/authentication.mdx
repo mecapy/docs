@@ -1,0 +1,149 @@
+---
+title: "Authentication"
+description: "How to authenticate with the MecaPy API"
+---
+
+## Overview
+
+MecaPy API uses **OAuth2 with PKCE** (Proof Key for Code Exchange) via Keycloak for secure authentication. All API endpoints (except public ones) require a valid JWT token.
+
+<Note>
+  Public endpoints that don't require authentication: `/docs`, `/redoc`, `/openapi.json`, `/health`, `/auth/login`, `/`
+</Note>
+
+## Authentication Methods
+
+### Bearer Token (Recommended)
+
+Include your JWT token in the `Authorization` header:
+
+```bash
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+### OAuth2 Flow
+
+MecaPy supports the **Authorization Code flow with PKCE** for maximum security:
+
+1. **Authorization**: Redirect users to Keycloak login
+2. **Token Exchange**: Exchange authorization code for access token
+3. **API Calls**: Use access token in Authorization header
+4. **Token Refresh**: Refresh tokens when expired
+
+<CardGroup cols={2}>
+  <Card title="OAuth2 Scopes" icon="key">
+    - `openid`: OpenID Connect
+    - `profile`: User profile information
+    - `email`: User email address
+  </Card>
+  <Card title="Token Format" icon="file-code">
+    JWT tokens signed with **RS256** algorithm
+  </Card>
+</CardGroup>
+
+## Getting Started
+
+### 1. Register Your Application
+
+Contact support@mecapy.com to register your application and receive:
+- Client ID
+- Redirect URI configuration
+- Access to Keycloak realm
+
+### 2. Obtain Access Token
+
+Use the `/auth/login` endpoint or implement OAuth2 flow directly:
+
+```bash
+# Using the API login endpoint
+POST https://api.mecapy.com/auth/login
+Content-Type: application/json
+
+{
+  "username": "your_username",
+  "password": "your_password"
+}
+```
+
+### 3. Use Token in API Calls
+
+```bash
+GET https://api.mecapy.com/functions
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+## Token Validation
+
+All tokens are validated using:
+- **JWKS** (JSON Web Key Set) from Keycloak
+- **RS256** signature verification
+- **Expiration** check
+- **Issuer** verification
+
+## Security Best Practices
+
+<Steps>
+  <Step title="Use HTTPS">
+    Always use HTTPS for API calls to protect tokens in transit
+  </Step>
+  <Step title="Secure Token Storage">
+    Store tokens securely (never in localStorage for web apps)
+  </Step>
+  <Step title="Token Refresh">
+    Implement token refresh before expiration
+  </Step>
+  <Step title="PKCE for Public Clients">
+    Always use PKCE for mobile and single-page applications
+  </Step>
+</Steps>
+
+## Keycloak Configuration
+
+<AccordionGroup>
+  <Accordion title="Realm Details">
+    - **Realm**: mecapy
+    - **Issuer URL**: `https://keycloak.mecapy.com/realms/mecapy`
+    - **JWKS URI**: `https://keycloak.mecapy.com/realms/mecapy/protocol/openid-connect/certs`
+  </Accordion>
+  <Accordion title="Client Configuration">
+    - **Client ID**: mecapy-api-public (for Swagger UI)
+    - **Client ID**: mecapy-api (for backend)
+    - **Access Type**: Public (for frontend) / Confidential (for backend)
+    - **Valid Redirect URIs**: Configured per client
+  </Accordion>
+</AccordionGroup>
+
+## Error Responses
+
+<ResponseField name="401 Unauthorized" type="error">
+  Token is missing or invalid
+</ResponseField>
+
+<ResponseField name="403 Forbidden" type="error">
+  Token is valid but user lacks required permissions
+</ResponseField>
+
+```json
+{
+  "detail": "Invalid authentication credentials"
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Login Endpoint"
+    icon="right-to-bracket"
+    href="/api-reference/auth/login"
+  >
+    Start with the login endpoint
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api-reference/introduction"
+  >
+    Explore all API endpoints
+  </Card>
+</CardGroup>

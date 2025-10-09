@@ -1,0 +1,46 @@
+---
+title: "List Jobs"
+api: "GET /jobs"
+description: "Get paginated list of execution jobs"
+---
+
+Returns a list of all function execution jobs for the authenticated user.
+
+## Query Parameters
+
+<ParamField query="page" type="integer" default="1">
+  Page number
+</ParamField>
+
+<ParamField query="per_page" type="integer" default="20">
+  Items per page (max 100)
+</ParamField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.mecapy.com/jobs?page=1&per_page=20 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success
+{
+  "jobs": [
+    {
+      "job_id": "job-abc123",
+      "function_id": "550e8400-e29b-41d4-a716-446655440000",
+      "status": "completed",
+      "created_at": "2025-01-20T10:30:00Z"
+    }
+  ],
+  "total": 100,
+  "page": 1,
+  "per_page": 20
+}
+```
+
+</ResponseExample>

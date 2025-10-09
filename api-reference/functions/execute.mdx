@@ -1,0 +1,51 @@
+---
+title: "Execute Function"
+api: "POST /functions/{function_id}/execute"
+description: "Execute a deployed function asynchronously"
+---
+
+Submits a function execution job to the worker queue. The function runs in an isolated Docker container and results are available via `/jobs/{job_id}/result` once completed.
+
+## Path Parameters
+
+<ParamField path="function_id" type="string" required>
+  Function UUID
+</ParamField>
+
+## Request Body
+
+<ParamField body="payload" type="object" required>
+  Input data for the function as JSON object
+</ParamField>
+
+<RequestExample>
+
+```python Python
+response = requests.post(
+    f"https://api.mecapy.com/functions/{function_id}/execute",
+    headers={"Authorization": f"Bearer {token}"},
+    json={
+        "payload": {
+            "diameter": 12,
+            "force": 5000
+        }
+    }
+)
+
+job_id = response.json()["job_id"]
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success
+{
+  "job_id": "job-abc123",
+  "function_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "pending",
+  "message": "Job job-abc123 submitted successfully. Use /jobs/job-abc123 to check status."
+}
+```
+
+</ResponseExample>

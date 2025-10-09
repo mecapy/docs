@@ -1,0 +1,42 @@
+---
+title: "Get Function"
+api: "GET /functions/{function_id}"
+description: "Get detailed information about a specific function"
+---
+
+Retrieves complete details about a function including status, configuration, and execution statistics. Only the function owner can access this information.
+
+## Path Parameters
+
+<ParamField path="function_id" type="string" required>
+  Function UUID
+</ParamField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.mecapy.com/functions/550e8400-e29b-41d4-a716-446655440000 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "calculate-stress",
+  "description": "Calculate mechanical stress",
+  "status": "ready",
+  "runtime": "python311",
+  "handler": "main.calculate",
+  "memory_limit": 512,
+  "timeout": 300,
+  "created_at": "2025-01-20T10:30:00Z",
+  "execution_count": 127,
+  "owner_id": "user-123"
+}
+```
+
+</ResponseExample>

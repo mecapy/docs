@@ -51,6 +51,16 @@
       "url": "https://discord.gg/mecapy"
     }
   ],
+  "openapi": ["openapi.json"],
+  "api": {
+    "baseUrl": "https://api.mecapy.com",
+    "auth": {
+      "method": "bearer"
+    },
+    "playground": {
+      "mode": "show"
+    }
+  },
   "navigation": [
     {
       "group": "Get Started",
@@ -91,8 +101,44 @@
     {
       "group": "API Reference",
       "pages": [
-        "api-reference/api-specifications",
-        "api-reference/authentication-providers",
+        "api-reference/introduction",
+        "api-reference/authentication"
+      ]
+    },
+    {
+      "group": "Functions",
+      "pages": [
+        "api-reference/functions/deploy-from-git",
+        "api-reference/functions/deploy",
+        "api-reference/functions/list",
+        "api-reference/functions/get",
+        "api-reference/functions/execute",
+        "api-reference/functions/delete"
+      ]
+    },
+    {
+      "group": "Packages",
+      "pages": [
+        "api-reference/packages/deploy-from-git"
+      ]
+    },
+    {
+      "group": "Jobs",
+      "pages": [
+        "api-reference/jobs/list",
+        "api-reference/jobs/get",
+        "api-reference/jobs/result"
+      ]
+    },
+    {
+      "group": "Authentication",
+      "pages": [
+        "api-reference/auth/login"
+      ]
+    },
+    {
+      "group": "Database Schema",
+      "pages": [
         "api-reference/database-schema"
       ]
     },

@@ -1,0 +1,36 @@
+---
+title: "Get Job Status"
+api: "GET /jobs/{job_id}"
+description: "Get execution status of a specific job"
+---
+
+Check the execution status of a function job.
+
+## Path Parameters
+
+<ParamField path="job_id" type="string" required>
+  Job ID
+</ParamField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.mecapy.com/jobs/job-abc123 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success
+{
+  "job_id": "job-abc123",
+  "function_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "created_at": "2025-01-20T10:30:00Z",
+  "completed_at": "2025-01-20T10:30:05Z"
+}
+```
+
+</ResponseExample>

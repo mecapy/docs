@@ -1,0 +1,36 @@
+---
+title: "Delete Function"
+api: "DELETE /functions/{function_id}"
+description: "Permanently delete a deployed function"
+---
+
+Removes a function from the platform. This action cannot be undone.
+
+<Warning>
+  All function data and execution history will be lost.
+</Warning>
+
+## Path Parameters
+
+<ParamField path="function_id" type="string" required>
+  Function UUID
+</ParamField>
+
+<RequestExample>
+
+```bash cURL
+curl -X DELETE https://api.mecapy.com/functions/550e8400-e29b-41d4-a716-446655440000 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success
+{
+  "message": "Function 'calculate-stress' deleted successfully"
+}
+```
+
+</ResponseExample>

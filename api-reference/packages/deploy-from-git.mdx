@@ -1,0 +1,109 @@
+---
+title: "Deploy Package from Git"
+api: "POST /packages/from-git"
+description: "Deploy a multi-function package from a Git repository"
+---
+
+Deploy multiple functions at once from a Git repository containing a `mecapy.yml` manifest. The manifest format is simple with automatic schema introspection from Python type hints.
+
+<Note>
+  Package versions are immutable. To update, increment the version in the manifest.
+</Note>
+
+## Request Body
+
+<ParamField body="git_url" type="string" required>
+  Git repository URL (GitHub, GitLab, Bitbucket)
+</ParamField>
+
+<ParamField body="git_ref" type="string" default="main">
+  Git reference (branch, tag, or commit SHA)
+</ParamField>
+
+<ParamField body="git_token" type="string">
+  Authentication token for private repositories
+</ParamField>
+
+<ParamField body="deploy_strategy" type="string" default="all">
+  Deployment strategy: `all` or `selective`
+</ParamField>
+
+<ParamField body="functions" type="array">
+  Function names to deploy (required if strategy is `selective`)
+</ParamField>
+
+## Manifest Format
+
+The `mecapy.yml` file defines your package:
+
+```yaml mecapy.yml
+name: boulonnerie
+description: Bolted assembly calculations
+version: 1.2.0
+author: Your Name
+license: MIT
+
+functions:
+  calcul-contrainte:
+    handler: vis.Vis:calculer_contrainte
+    description: Calculate bolt stress
+    init: [diametre, materiau]
+    
+  calcul-cisaillement:
+    handler: vis.Vis:calculer_cisaillement
+    description: Calculate shear stress
+```
+
+<RequestExample>
+
+```bash Deploy All Functions
+curl -X POST https://api.mecapy.com/packages/from-git \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "git_url": "https://github.com/mecapy/boulonnerie.git",
+    "git_ref": "main",
+    "deploy_strategy": "all"
+  }'
+```
+
+```python Deploy Selective Functions
+response = requests.post(
+    "https://api.mecapy.com/packages/from-git",
+    headers={"Authorization": f"Bearer {token}"},
+    json={
+        "git_url": "https://github.com/mecapy/boulonnerie.git",
+        "git_ref": "v1.2.0",
+        "deploy_strategy": "selective",
+        "functions": ["calcul-contrainte", "calcul-cisaillement"]
+    }
+)
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success
+{
+  "package": {
+    "id": 123,
+    "name": "boulonnerie",
+    "version": "1.2.0",
+    "status": "ready",
+    "git_url": "https://github.com/mecapy/boulonnerie.git",
+    "functions": [
+      {
+        "name": "calcul-contrainte",
+        "version": "1.2.0",
+        "status": "ready"
+      }
+    ]
+  },
+  "functions_deployed": 2,
+  "functions_updated": 0,
+  "functions_unchanged": 0
+}
+```
+
+</ResponseExample>
