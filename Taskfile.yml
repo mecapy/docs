@@ -14,14 +14,14 @@ tasks:
       - command -v mintlify
 
   # Development server
-  preview:
+  prod:preview:
     desc: "Start Mintlify development server (uses production API)"
     cmds:
       - mintlify dev
     deps:
       - install
 
-  dev:local:
+  dev:preview:
     desc: "Start Mintlify with local API (requires API running on :8000)"
     cmds:
       - cp mint.json mint.json.backup
@@ -31,30 +31,12 @@ tasks:
     deps:
       - install
 
-  build:
-    desc: "Build documentation for production"
-    cmds:
-      - mintlify build
-    deps:
-      - install
-
   check:
     desc: "Check documentation for broken links and errors"
     cmds:
       - mintlify broken-links
     deps:
       - install
-
-  # OpenAPI generation (only needed for offline development)
-  openapi:
-    desc: "Generate local OpenAPI spec for offline development"
-    dir: ../api
-    cmds:
-      - .venv/bin/python generate_openapi.py
-      - cp openapi.json ../docs/openapi-local.json
-      - cp openapi.yaml ../docs/openapi-local.yaml
-      - echo "✓ Local OpenAPI specification generated"
-      - echo "ℹ️  Note: Production uses dynamic URL (https://api.mecapy.com/openapi.json)"
 
   # Cleanup
   clean:

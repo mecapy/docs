@@ -178,4 +178,4 @@ functions:
 
 ## Documentation complète
 
-Pour plus de détails : [MANIFEST_FORMAT.md](./MANIFEST_FORMAT.md)
+Pour plus de détails : [MANIFEST_FORMAT.md](./packages/MANIFEST_FORMAT.md)

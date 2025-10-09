@@ -960,8 +960,8 @@ init:
 
 ## 📖 Références
 
-- [MANIFEST_INTROSPECTION.md](../repos/functions/example/docs/MANIFEST_INTROSPECTION.md) - Règles d'introspection détaillées
-- [MIGRATION_IMPACT.md](../repos/functions/example/docs/MIGRATION_IMPACT.md) - Impact de la migration
+- [MANIFEST_INTROSPECTION.md](./MANIFEST_INTROSPECTION.md) - Règles d'introspection détaillées
+- [MIGRATION_IMPACT.md](./MIGRATION_IMPACT.md) - Impact de la migration
 - [Pydantic Field Documentation](https://docs.pydantic.dev/latest/concepts/fields/)
 - [NumPy Docstring Standard](https://numpydoc.readthedocs.io/en/latest/format.html)
 
