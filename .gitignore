@@ -1,24 +1,11 @@
-# Dependencies
-node_modules/
-
-# Mintlify
+# Mintlify build artifacts
 .mintlify/
+node_modules/
+package-lock.json
 
-# Build
-.cache/
-dist/
+# OpenAPI static files (we use dynamic URLs now)
+openapi.json
+openapi.yaml
 
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Logs
-*.log
-npm-debug.log*
+# Backup files
+*.backup

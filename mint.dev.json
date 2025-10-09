@@ -1,0 +1,16 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "MecaPy Documentation (Dev)",
+  "openapi": [
+    "http://localhost:8000/openapi.json"
+  ],
+  "api": {
+    "baseUrl": "http://localhost:8000",
+    "auth": {
+      "method": "bearer"
+    },
+    "playground": {
+      "mode": "show"
+    }
+  }
+}

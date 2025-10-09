@@ -38,20 +38,23 @@ repos/docs/
 
 ## Features
 
-### 1. Automatic OpenAPI Generation
+### 1. Dynamic OpenAPI Integration
 
-The OpenAPI specification is automatically generated from the FastAPI application using a custom script:
+The documentation automatically pulls the OpenAPI specification from the live API:
 
+**Production**: `https://api.mecapy.com/openapi.json`
+**Local Dev**: `http://localhost:8000/openapi.json`
+
+This means:
+- ✅ Always synchronized with deployed API
+- ✅ No manual regeneration needed
+- ✅ Updates automatically with each API deployment
+
+**For offline development** (optional):
 ```bash
-# From repos/docs directory
+# Generate static OpenAPI spec for offline work
 task openapi
 ```
-
-This command:
-- Runs `generate_openapi.py` in the API directory
-- Exports OpenAPI 3.1 specification as JSON and YAML
-- Copies the files to the docs directory
-- Includes server URLs, security schemes, and authentication
 
 ### 2. Mintlify Integration
 

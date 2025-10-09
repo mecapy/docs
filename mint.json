@@ -51,7 +51,9 @@
       "url": "https://discord.gg/mecapy"
     }
   ],
-  "openapi": ["openapi.json"],
+  "openapi": [
+    "https://api.mecapy.com/openapi.json"
+  ],
   "api": {
     "baseUrl": "https://api.mecapy.com",
     "auth": {
