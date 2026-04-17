@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "MecaPy Documentation",
+  "name": "MecaPy Documentation (Dev)",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
@@ -52,10 +52,10 @@
     }
   ],
   "openapi": [
-    "https://api.mecapy.com/openapi.json"
+    "http://localhost:8000/openapi.json"
   ],
   "api": {
-    "baseUrl": "https://api.mecapy.com",
+    "baseUrl": "http://localhost:8000",
     "auth": {
       "method": "bearer"
     },
@@ -121,7 +121,10 @@
     {
       "group": "Packages",
       "pages": [
-        "api-reference/packages/deploy-from-git"
+        "api-reference/packages/list",
+        "api-reference/packages/get",
+        "api-reference/packages/deploy-from-git",
+        "api-reference/packages/update-visibility"
       ]
     },
     {
@@ -135,13 +138,29 @@
     {
       "group": "Authentication",
       "pages": [
-        "api-reference/auth/login"
+        "api-reference/auth/login",
+        "api-reference/auth/me",
+        "api-reference/auth/protected",
+        "api-reference/auth/admin"
+      ]
+    },
+    {
+      "group": "System",
+      "pages": [
+        "api-reference/root",
+        "api-reference/health"
       ]
     },
     {
       "group": "Database Schema",
       "pages": [
         "api-reference/database-schema"
+      ]
+    },
+    {
+      "group": "Python SDK",
+      "pages": [
+        "sdk/json-test-runner"
       ]
     },
     {

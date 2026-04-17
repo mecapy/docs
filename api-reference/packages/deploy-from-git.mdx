@@ -42,6 +42,7 @@ description: Bolted assembly calculations
 version: 1.2.0
 author: Your Name
 license: MIT
+visibility: public   # "public" | "private" (default: private)
 
 functions:
   calcul-contrainte:
@@ -53,6 +54,10 @@ functions:
     handler: vis.Vis:calculer_cisaillement
     description: Calculate shear stress
 ```
+
+<Info>
+  Visibility can also be changed after deployment via [`PATCH /packages/{id}/visibility`](/api-reference/packages/update-visibility) without requiring a redeploy.
+</Info>
 
 <RequestExample>
 

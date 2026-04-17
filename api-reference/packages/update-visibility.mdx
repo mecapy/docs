@@ -1,0 +1,73 @@
+---
+title: "Update Visibility"
+api: "PATCH /packages/{package_id}/visibility"
+description: "Change the visibility of a package (public or private)"
+---
+
+Update the visibility of a package without redeploying. Only the package owner can change visibility.
+
+The `visibility` field in `mecapy.yml` sets the initial value at deploy time. Use this endpoint to change it afterwards — for example, to publish a package after internal validation.
+
+<Note>
+  Requires authentication. Only the package owner can change visibility.
+</Note>
+
+## Path Parameters
+
+<ParamField path="package_id" type="string" required>
+  Unique identifier of the package (UUID)
+</ParamField>
+
+## Request Body
+
+<ParamField body="is_public" type="boolean" required>
+  Set to `true` to make the package publicly visible, `false` to make it private.
+</ParamField>
+
+<RequestExample>
+
+```bash Make public
+curl -X PATCH https://api.mecapy.com/packages/17ad586c-0579-48e9-ba00-dcf6668d648c/visibility \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"is_public": true}'
+```
+
+```bash Make private
+curl -X PATCH https://api.mecapy.com/packages/17ad586c-0579-48e9-ba00-dcf6668d648c/visibility \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"is_public": false}'
+```
+
+```python Python
+response = requests.patch(
+    "https://api.mecapy.com/packages/17ad586c-0579-48e9-ba00-dcf6668d648c/visibility",
+    headers={"Authorization": f"Bearer {token}"},
+    json={"is_public": True},
+)
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success
+{
+  "id": "17ad586c-0579-48e9-ba00-dcf6668d648c",
+  "name": "e25-030-1",
+  "version": "1.0.0",
+  "status": "ready",
+  "is_public": true,
+  "functions": [...],
+  "owner_id": "demo@mecapy.com"
+}
+```
+
+```json 403 Not owner
+{
+  "detail": "Only the package owner can change visibility"
+}
+```
+
+</ResponseExample>

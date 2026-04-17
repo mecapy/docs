@@ -1,0 +1,80 @@
+---
+title: "List Packages"
+api: "GET /packages"
+description: "List public packages and own packages (if authenticated)"
+---
+
+Returns a paginated list of packages. **No authentication required.**
+
+- **Without token** — returns all public packages
+- **With token** — returns all public packages + your own private packages
+
+## Query Parameters
+
+<ParamField query="page" type="integer" default="1">
+  Page number (starts at 1)
+</ParamField>
+
+<ParamField query="per_page" type="integer" default="20">
+  Items per page (max 100)
+</ParamField>
+
+<RequestExample>
+
+```bash Public (no auth)
+curl https://api.mecapy.com/packages
+```
+
+```bash Authenticated
+curl https://api.mecapy.com/packages \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+# Public
+response = requests.get("https://api.mecapy.com/packages")
+
+# Authenticated (also returns your private packages)
+response = requests.get(
+    "https://api.mecapy.com/packages",
+    headers={"Authorization": f"Bearer {token}"},
+)
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success
+{
+  "packages": [
+    {
+      "id": "17ad586c-0579-48e9-ba00-dcf6668d648c",
+      "name": "e25-030-1",
+      "description": "Calculations for pre-loaded bolted joints per NF E25-030-1",
+      "version": "1.0.0",
+      "status": "ready",
+      "is_public": true,
+      "author": "MecaPy Team",
+      "license": "Copyright MecaPy",
+      "tags": ["assemblage-visse", "NF-E25-030-1"],
+      "functions": [
+        {
+          "name": "check",
+          "version": "1.0.0",
+          "handler": "handler.check",
+          "checksum": "cdd4ce29...",
+          "status": "ready",
+          "created_at": "2026-04-16T23:02:58.485266"
+        }
+      ],
+      "created_at": "2026-04-16T23:02:58.467479",
+      "updated_at": "2026-04-16T23:02:58.467770",
+      "owner_id": "demo@mecapy.com"
+    }
+  ],
+  "total": 1
+}
+```
+
+</ResponseExample>

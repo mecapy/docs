@@ -1,0 +1,90 @@
+---
+title: "Get Package"
+api: "GET /packages/{package_id}"
+description: "Get details of a specific package"
+---
+
+Returns complete package information including all deployed function versions.
+
+- **Public packages** — accessible without authentication
+- **Private packages** — require authentication and ownership
+
+## Path Parameters
+
+<ParamField path="package_id" type="string" required>
+  Unique identifier of the package (UUID)
+</ParamField>
+
+<RequestExample>
+
+```bash Public package (no auth)
+curl https://api.mecapy.com/packages/17ad586c-0579-48e9-ba00-dcf6668d648c
+```
+
+```bash Private package (auth required)
+curl https://api.mecapy.com/packages/17ad586c-0579-48e9-ba00-dcf6668d648c \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+response = requests.get(
+    "https://api.mecapy.com/packages/17ad586c-0579-48e9-ba00-dcf6668d648c",
+    headers={"Authorization": f"Bearer {token}"},  # optional for public packages
+)
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success
+{
+  "id": "17ad586c-0579-48e9-ba00-dcf6668d648c",
+  "name": "e25-030-1",
+  "description": "Calculations for pre-loaded bolted joints per NF E25-030-1",
+  "version": "1.0.0",
+  "status": "ready",
+  "is_public": true,
+  "git_url": "https://github.com/mecapy/function-e25-30-1.git",
+  "git_ref": "main",
+  "git_commit_sha": "38a498b7867cf7385203e006a05b558ffd5e324e",
+  "author": "MecaPy Team",
+  "license": "Copyright MecaPy",
+  "tags": ["assemblage-visse", "NF-E25-030-1", "mecanique"],
+  "functions": [
+    {
+      "name": "check",
+      "version": "1.0.0",
+      "handler": "handler.check",
+      "checksum": "cdd4ce299b49ed7b7047be3a105fc1f95011a2f271a65303fde2ad51ad1dfa7c",
+      "status": "ready",
+      "created_at": "2026-04-16T23:02:58.485266"
+    },
+    {
+      "name": "min_preload",
+      "version": "1.0.0",
+      "handler": "handler.F0_min",
+      "checksum": "857da202...",
+      "status": "ready",
+      "created_at": "2026-04-16T23:02:58.488668"
+    }
+  ],
+  "created_at": "2026-04-16T23:02:58.467479",
+  "updated_at": "2026-04-16T23:02:58.467770",
+  "owner_id": "demo@mecapy.com"
+}
+```
+
+```json 403 Private package
+{
+  "detail": "Access denied to this package"
+}
+```
+
+```json 404 Not found
+{
+  "detail": "Package not found"
+}
+```
+
+</ResponseExample>

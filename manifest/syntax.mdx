@@ -10,6 +10,7 @@ name: nom-package
 description: Description
 author: Nom Auteur
 license: MIT
+visibility: private   # "public" | "private" (défaut: private)
 tags:
   - tag1
   - tag2
@@ -75,6 +76,20 @@ license: Apache-2.0
 # ou
 license: GPL-3.0
 ```
+
+### visibility (optionnel)
+
+Visibilité du package. Par défaut : `private`.
+
+```yaml
+visibility: public   # Visible par tous, sans authentification
+# ou
+visibility: private  # Visible uniquement par le propriétaire (défaut)
+```
+
+<Info>
+  La visibilité peut être modifiée après déploiement via l'API ou l'interface web, sans redéployer le package.
+</Info>
 
 ### tags (optionnel)
 
