@@ -16,7 +16,7 @@ description: 'Bienvenue dans la documentation MecaPy'
 
 ## Qu'est-ce que MecaPy ?
 
-MecaPy est une plateforme serverless pour déployer et exécuter des fonctions Python d'ingénierie et de calcul scientifique.
+MecaPy est une plateforme pour déployer et exécuter des fonctions Python d'ingénierie et de calcul scientifique, via un worker asynchrone (Redis + Docker).
 
 <CardGroup cols={2}>
   <Card
@@ -64,8 +64,8 @@ MecaPy est une plateforme serverless pour déployer et exécuter des fonctions P
     Validation des entrées/sorties basée sur JSON Schema. Sécurité et isolation des exécutions.
   </Accordion>
 
-  <Accordion icon="gauge-high" title="Exécution serverless">
-    Scaling automatique, pas de serveur à gérer. Payez uniquement pour ce que vous utilisez.
+  <Accordion icon="gauge-high" title="Exécution asynchrone via worker">
+    Les fonctions s'exécutent dans des conteneurs Docker isolés via une file Redis. Les résultats sont récupérables via GET /jobs/{id}/result.
   </Accordion>
 </AccordionGroup>
 

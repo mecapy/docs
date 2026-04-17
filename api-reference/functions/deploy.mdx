@@ -1,10 +1,10 @@
 ---
 title: "Deploy Function from ZIP"
 api: "POST /functions/deploy"
-description: "Deploy a serverless function from a base64-encoded ZIP archive"
+description: "Deploy a function from a base64-encoded ZIP archive"
 ---
 
-Deploy your code as a serverless function by uploading a base64-encoded ZIP archive. The platform automatically manages scaling, resource allocation, load balancing, and cold start optimization.
+Deploy your code as a function by uploading a base64-encoded ZIP archive. Execution is asynchronous via a Docker worker queue (Redis).
 
 ## Request Body
 

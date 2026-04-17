@@ -1,10 +1,10 @@
 ---
 title: "Deploy Function from Git"
 api: "POST /functions/from-git"
-description: "Deploy a serverless function directly from a Git repository"
+description: "Deploy a function directly from a Git repository"
 ---
 
-Deploy a serverless function from a Git repository (GitHub, GitLab, Bitbucket). This endpoint clones the repository, validates the code for security, and deploys it as a serverless function.
+Deploy a function from a Git repository (GitHub, GitLab, Bitbucket). This endpoint clones the repository, validates the code for security, and registers it for asynchronous execution via the Docker worker.
 
 <Note>
   Supports both **public** and **private** repositories with authentication tokens.

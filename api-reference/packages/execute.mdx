@@ -1,0 +1,109 @@
+---
+title: "Execute Package Function"
+api: "POST /packages/{package_id}/functions/{function_name}/execute"
+description: "Execute a function from a deployed package asynchronously"
+---
+
+Submit a function execution job to the worker queue. The function runs in an isolated Docker container; retrieve the result via `GET /jobs/{job_id}/result` once completed.
+
+**Authentication required.** Access control:
+- **Public package** → any authenticated user can execute
+- **Private package** → owner only
+
+<Note>
+  Execution is asynchronous. The endpoint returns a `job_id` immediately.
+  Poll `GET /jobs/{job_id}/result` for the result.
+</Note>
+
+## Path Parameters
+
+<ParamField path="package_id" type="string" required>
+  Unique identifier of the package (UUID)
+</ParamField>
+
+<ParamField path="function_name" type="string" required>
+  Name of the function as declared in `mecapy.yml` (e.g. `min_preload`, `check`)
+</ParamField>
+
+## Request Body
+
+<ParamField body="payload" type="object">
+  Input data passed to the function. Shape depends on the function's input schema.
+</ParamField>
+
+<RequestExample>
+
+```bash cURL
+curl -X POST \
+  "https://api.mecapy.com/packages/17ad586c-0579-48e9-ba00-dcf6668d648c/functions/min_preload/execute" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payload": {
+      "d": 12,
+      "p": 1.75,
+      "fy": 900,
+      "mu_th": 0.12,
+      "mu_b": 0.12
+    }
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://api.mecapy.com/packages/17ad586c/functions/min_preload/execute",
+    headers={"Authorization": f"Bearer {token}"},
+    json={
+        "payload": {
+            "d": 12,
+            "p": 1.75,
+            "fy": 900,
+            "mu_th": 0.12,
+            "mu_b": 0.12,
+        }
+    },
+)
+job_id = response.json()["job_id"]
+
+# Poll for result
+import time
+while True:
+    result = requests.get(
+        f"https://api.mecapy.com/jobs/{job_id}/result",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    data = result.json()
+    if data.get("status") in ("completed", "failed"):
+        print(data)
+        break
+    time.sleep(1)
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Job submitted
+{
+  "job_id": "0e894cef-c419-46e9-9af1-b52ac2e528fe",
+  "function_id": "e210e251-d358-4152-85d2-e23d5373a97b",
+  "status": "pending",
+  "message": "Job 0e894cef submitted. Track via GET /jobs/0e894cef/result"
+}
+```
+
+```json 403 Private package
+{
+  "detail": "Access denied: this package is private"
+}
+```
+
+```json 404 Function not found
+{
+  "detail": "Function 'unknown_fn' not found in package 'e25-030-1'. Available: ['check', 'min_preload', 'max_preload']"
+}
+```
+
+</ResponseExample>
