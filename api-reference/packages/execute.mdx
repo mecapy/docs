@@ -13,6 +13,7 @@ Submit a function execution job to the worker queue. The function runs in an iso
 <Note>
   Execution is asynchronous. The endpoint returns a `job_id` immediately.
   Poll `GET /jobs/{job_id}/result` for the result.
+  The [Python SDK](/sdk/python-client) handles polling automatically.
 </Note>
 
 ## Path Parameters
@@ -40,35 +41,48 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -d '{
     "payload": {
-      "d": 12,
-      "p": 1.75,
-      "fy": 900,
-      "mu_th": 0.12,
-      "mu_b": 0.12
+      "bolt":       {"d": 12.0, "p": 1.75, "As": 84.3, "Re_min": 900.0, "quality_class": "10.9"},
+      "assembly":   {"dh": 13.0, "do": 22.0, "Rc": 200.0, "mu_p_min": 0.12},
+      "loads":      {"FA_max": 5000.0, "Ft_max": 3000.0},
+      "tightening": {"mu_tot_min": 0.10, "mu_tot_max": 0.16, "precision_class": "C20"}
     }
   }'
 ```
 
-```python Python
+```python Python SDK
+from mecapy import MecaPyClient, Auth
+
+client = MecaPyClient(auth=Auth.Token("YOUR_TOKEN"))
+pkg = client.load("e25-030-1")
+
+result = pkg.min_preload(
+    bolt={"d": 12.0, "p": 1.75, "As": 84.3, "Re_min": 900.0, "quality_class": "10.9"},
+    assembly={"dh": 13.0, "do": 22.0, "Rc": 200.0, "mu_p_min": 0.12},
+    loads={"FA_max": 5000.0, "Ft_max": 3000.0},
+    tightening={"mu_tot_min": 0.10, "mu_tot_max": 0.16, "precision_class": "C20"},
+)
+print(result)
+```
+
+```python Python (requests)
 import requests
+import time
 
 response = requests.post(
-    "https://api.mecapy.com/packages/17ad586c/functions/min_preload/execute",
+    "https://api.mecapy.com/packages/17ad586c-0579-48e9-ba00-dcf6668d648c/functions/min_preload/execute",
     headers={"Authorization": f"Bearer {token}"},
     json={
         "payload": {
-            "d": 12,
-            "p": 1.75,
-            "fy": 900,
-            "mu_th": 0.12,
-            "mu_b": 0.12,
+            "bolt":       {"d": 12.0, "p": 1.75, "As": 84.3, "Re_min": 900.0, "quality_class": "10.9"},
+            "assembly":   {"dh": 13.0, "do": 22.0, "Rc": 200.0, "mu_p_min": 0.12},
+            "loads":      {"FA_max": 5000.0, "Ft_max": 3000.0},
+            "tightening": {"mu_tot_min": 0.10, "mu_tot_max": 0.16, "precision_class": "C20"},
         }
     },
 )
 job_id = response.json()["job_id"]
 
 # Poll for result
-import time
 while True:
     result = requests.get(
         f"https://api.mecapy.com/jobs/{job_id}/result",
@@ -78,7 +92,7 @@ while True:
     if data.get("status") in ("completed", "failed"):
         print(data)
         break
-    time.sleep(1)
+    time.sleep(2)
 ```
 
 </RequestExample>

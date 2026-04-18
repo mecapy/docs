@@ -65,24 +65,31 @@ curl -X POST https://api.mecapy.com/packages/from-git \
 
 ## Étape 4 : Appeler votre fonction
 
-```bash
-curl -X POST https://api.mecapy.com/functions/addition/invoke \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "x": 10,
-    "y": 5
-  }'
+<CodeGroup>
+
+```python Python SDK
+from mecapy import MecaPyClient, Auth
+
+client = MecaPyClient(auth=Auth.Token("YOUR_API_KEY"))
+pkg = client.load("mon-premier-package")
+
+result = pkg.addition(x=10, y=5)
+print(result)  # {'result': 15.0}
 ```
 
-Réponse :
-```json
-{
-  "result": 15.0,
-  "execution_time_ms": 12,
-  "function_id": "mon-premier-package/addition/1.0.0"
-}
+```bash cURL
+curl -X POST \
+  "https://api.mecapy.com/packages/{package_id}/functions/addition/execute" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"payload": {"x": 10, "y": 5}}'
 ```
+
+</CodeGroup>
+
+<Tip>
+  Le SDK gère automatiquement le polling du résultat. Consultez la [documentation du client Python](/sdk/python-client) pour les options avancées (jobs non-bloquants, timeout, etc.).
+</Tip>
 
 ## Exemples avancés
 

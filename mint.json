@@ -161,6 +161,7 @@
     {
       "group": "Python SDK",
       "pages": [
+        "sdk/python-client",
         "sdk/json-test-runner"
       ]
     },
