@@ -1,0 +1,40 @@
+---
+title: "Get Current User"
+api: "GET /auth/me"
+description: "Get authenticated user information"
+---
+
+Récupère les informations de l'utilisateur actuellement authentifié.
+
+<Note>
+  Cet endpoint nécessite un Bearer token valide.
+</Note>
+
+## Usage
+
+Utilisez cet endpoint pour :
+- Vérifier l'identité de l'utilisateur connecté
+- Afficher les informations du profil utilisateur
+- Vérifier les permissions de l'utilisateur
+
+<RequestExample>
+
+```bash cURL
+curl https://api.mecapy.com/auth/me \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+import requests
+
+headers = {"Authorization": "Bearer YOUR_TOKEN"}
+response = requests.get(
+    "https://api.mecapy.com/auth/me",
+    headers=headers
+)
+
+user = response.json()
+print(user)
+```
+
+</RequestExample>

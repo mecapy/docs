@@ -1,0 +1,39 @@
+---
+title: "Admin Endpoint"
+api: "GET /auth/admin"
+description: "Admin-only endpoint for testing role-based access"
+---
+
+Endpoint de test pour vérifier les accès administrateur.
+
+<Warning>
+  Cet endpoint nécessite un rôle **admin** dans le token JWT.
+</Warning>
+
+## Usage
+
+Utilisez cet endpoint pour :
+- Tester l'authentification avec rôle admin
+- Vérifier les permissions administrateur
+- Debugging des politiques d'accès
+
+<RequestExample>
+
+```bash cURL
+curl https://api.mecapy.com/auth/admin \
+  -H "Authorization: Bearer ADMIN_TOKEN"
+```
+
+```python Python
+import requests
+
+headers = {"Authorization": "Bearer ADMIN_TOKEN"}
+response = requests.get(
+    "https://api.mecapy.com/auth/admin",
+    headers=headers
+)
+
+print(response.json())
+```
+
+</RequestExample>

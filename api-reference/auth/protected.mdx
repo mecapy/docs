@@ -1,0 +1,39 @@
+---
+title: "Protected Endpoint"
+api: "GET /auth/protected"
+description: "Test endpoint for authentication"
+---
+
+Endpoint de test pour vérifier l'authentification.
+
+<Note>
+  Cet endpoint nécessite un Bearer token valide.
+</Note>
+
+## Usage
+
+Utilisez cet endpoint pour :
+- Tester que votre token est valide
+- Vérifier l'authentification dans votre application
+- Debugging des problèmes d'auth
+
+<RequestExample>
+
+```bash cURL
+curl https://api.mecapy.com/auth/protected \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+import requests
+
+headers = {"Authorization": "Bearer YOUR_TOKEN"}
+response = requests.get(
+    "https://api.mecapy.com/auth/protected",
+    headers=headers
+)
+
+print(response.json())
+```
+
+</RequestExample>

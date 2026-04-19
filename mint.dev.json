@@ -135,13 +135,29 @@
     {
       "group": "Authentication",
       "pages": [
-        "api-reference/auth/login"
+        "api-reference/auth/login",
+        "api-reference/auth/me",
+        "api-reference/auth/protected",
+        "api-reference/auth/admin"
+      ]
+    },
+    {
+      "group": "System",
+      "pages": [
+        "api-reference/root",
+        "api-reference/health"
       ]
     },
     {
       "group": "Database Schema",
       "pages": [
         "api-reference/database-schema"
+      ]
+    },
+    {
+      "group": "Python SDK",
+      "pages": [
+        "sdk/json-test-runner"
       ]
     },
     {

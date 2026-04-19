@@ -1,0 +1,218 @@
+---
+title: "JSON Test Runner"
+description: "Test runner générique JSON-driven pour les packages MecaPy — écrivez vos cas de test sans code Python."
+---
+
+## Vue d'ensemble
+
+`mecapy.testing.TestRunner` est un outil de test inclus dans le SDK MecaPy qui permet aux experts métier d'écrire des cas de test en JSON, sans écrire de code Python.
+
+Le runner :
+- Charge automatiquement tous les fichiers `test_*.json` d'un répertoire
+- Importe dynamiquement les modules Python référencés
+- Compare les résultats avec une tolérance numérique configurable
+- Retourne un code de sortie CI/CD-compatible (`0` = succès, `1` = échec)
+
+## Installation
+
+Le test runner est inclus dans le SDK MecaPy :
+
+```bash
+pip install mecapy-sdk
+```
+
+Une fois installé, la commande `mecapy-test` est disponible dans votre environnement.
+
+## Format des fichiers de test
+
+Chaque fichier `test_*.json` suit cette structure :
+
+```json
+{
+  "handler": "handler:ma_fonction",
+  "description": "Description générale des tests",
+  "test_cases": [
+    {
+      "name": "cas_nominal",
+      "description": "Cas nominal avec valeurs standard",
+      "request": {
+        "param1": { "a": 10, "b": 1.5 },
+        "param2": { "x": 100 }
+      },
+      "expected": {
+        "resultat": 42.0,
+        "valide": true
+      },
+      "tolerance": { "numeric": 0.1 }
+    }
+  ]
+}
+```
+
+### Champs du fichier
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `handler` | `string` | Référence à la fonction Python (`"module:fonction"`) |
+| `description` | `string` | Description globale des tests |
+| `test_cases` | `array` | Liste des cas de test |
+
+### Champs d'un cas de test
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `name` | `string` | Identifiant unique (snake_case) |
+| `description` | `string` | Description du scénario |
+| `request` | `object` | Paramètres passés à la fonction (dans l'ordre) |
+| `expected` | `object` | Résultat attendu (peut être partiel) |
+| `tolerance.numeric` | `float` | Tolérance absolue pour les comparaisons numériques |
+
+### Format du handler
+
+| Format | Exemple | Description |
+|--------|---------|-------------|
+| `module:fonction` | `handler:calculer` | Fonction au niveau module |
+| `module.Classe:methode` | `handler.Calc:run` | Méthode de classe |
+
+## Utilisation en ligne de commande
+
+```bash
+# Lancer les tests du répertoire tests/
+mecapy-test tests/
+
+# Avec un titre personnalisé
+mecapy-test tests/ --title "NF E25-030-1"
+
+# Avec un répertoire de module à ajouter au sys.path
+mecapy-test tests/ --sys-path /path/to/my/handler --title "Mon Projet"
+```
+
+### Options CLI
+
+| Option | Description | Défaut |
+|--------|-------------|--------|
+| `tests_dir` | Répertoire contenant les `test_*.json` | `tests/` |
+| `--title` | Titre affiché dans l'en-tête | `TEST RUNNER` |
+| `--sys-path` | Répertoire ajouté au `sys.path` pour l'import | _(aucun)_ |
+
+## Utilisation programmatique
+
+```python
+from pathlib import Path
+from mecapy.testing import TestRunner
+
+runner = TestRunner(Path("tests"), title="NF E25-030-1")
+runner.run_all_tests()  # sys.exit(0) ou sys.exit(1)
+```
+
+## Intégration CI/CD
+
+<CodeGroup>
+
+```yaml GitHub Actions
+- name: Run MecaPy tests
+  run: |
+    cd repos/functions/mon-package
+    mecapy-test tests/ --sys-path . --title "Mon Package"
+```
+
+```yaml GitLab CI
+test:
+  script:
+    - cd repos/functions/mon-package
+    - mecapy-test tests/ --sys-path . --title "Mon Package"
+```
+
+</CodeGroup>
+
+Le script retourne :
+- **Code 0** : tous les tests réussis
+- **Code 1** : au moins un test échoué
+
+## Fonctionnalités avancées
+
+### Tests partiels
+
+Il n'est pas nécessaire de spécifier toutes les valeurs dans `expected`. Seules les clés présentes sont vérifiées :
+
+```json
+"expected": {
+  "valide": true,
+  "precharge": {
+    "F0_min": 18333.3
+  }
+}
+```
+
+### Smoke tests
+
+Un `expected` vide `{}` crée un *smoke test* : la fonction est appelée mais aucune valeur n'est vérifiée. Utile pour s'assurer qu'une fonction ne lève pas d'exception.
+
+```json
+"expected": {}
+```
+
+### Tolérance par cas de test
+
+Chaque cas de test peut définir sa propre tolérance :
+
+```json
+"tolerance": { "numeric": 1.0 }
+```
+
+| Type de valeur | Comparaison |
+|----------------|-------------|
+| `int` / `float` | `abs(actual - expected) <= tolerance` |
+| `bool` | Stricte (`==`) |
+| `str` | Stricte (`==`) |
+| `dict` | Récursive sur les clés présentes dans `expected` |
+| `list` | Élément par élément |
+
+## Exemple complet
+
+Structure d'un package MecaPy avec tests JSON :
+
+```
+mon-package/
+├── handler.py          # Fonctions de calcul
+├── mecapy.yml          # Manifeste MecaPy
+└── tests/
+    ├── test_calcul_A.json
+    └── test_calcul_B.json
+```
+
+Lancement :
+
+```bash
+cd mon-package
+mecapy-test tests/ --sys-path . --title "Mon Package"
+```
+
+Sortie :
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              Mon Package                                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+================================================================================
+Test File: test_calcul_A.json
+================================================================================
+
+Handler: handler:ma_fonction
+Description: Tests de ma fonction de calcul
+
+  Test: cas_nominal
+  Description: Cas nominal avec valeurs standard
+  ✓ PASSED
+
+================================================================================
+RÉSUMÉ DES TESTS
+================================================================================
+
+  Total de tests : 1
+  Réussis : 1
+  Échoués : 0
+
+  Taux de réussite : 100.0%
+```

@@ -1,0 +1,33 @@
+---
+title: "Health Check"
+api: "GET /health"
+description: "Check API health status"
+---
+
+Health check endpoint pour vérifier que l'API est opérationnelle.
+
+<Note>
+  Cet endpoint ne nécessite pas d'authentification.
+</Note>
+
+## Usage
+
+Utilisez cet endpoint pour :
+- Monitoring de l'API
+- Health checks dans vos pipelines CI/CD
+- Vérification de la disponibilité avant déploiement
+
+<RequestExample>
+
+```bash cURL
+curl https://api.mecapy.com/health
+```
+
+```python Python
+import requests
+
+response = requests.get("https://api.mecapy.com/health")
+print(response.json())
+```
+
+</RequestExample>

@@ -1,0 +1,26 @@
+---
+title: "API Root"
+api: "GET /"
+description: "API root endpoint with basic information"
+---
+
+Endpoint racine de l'API retournant les informations de base.
+
+<Note>
+  Cet endpoint ne nécessite pas d'authentification.
+</Note>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.mecapy.com/
+```
+
+```python Python
+import requests
+
+response = requests.get("https://api.mecapy.com/")
+print(response.json())
+```
+
+</RequestExample>
