@@ -1,0 +1,98 @@
+---
+title: "Update Package from ZIP"
+api: "POST /packages/{package_id}/versions/from-zip"
+description: "Deploy a new version of an existing package by uploading a ZIP archive"
+---
+
+Deploy a new version of an existing package by uploading a ZIP archive containing
+a `mecapy.yml` manifest and the package sources. Mirrors
+[`POST /packages/{package_id}/versions/from-git`](/api-reference/packages/update-from-git)
+but reads the sources from a ZIP upload instead of a Git repository.
+
+<Note>
+  Only the package owner can update a package. The manifest must declare the
+  same package name and a version strictly greater than the current one (SemVer).
+</Note>
+
+## Path Parameters
+
+<ParamField path="package_id" type="string" required>
+  Unique identifier of the existing package
+</ParamField>
+
+## Form Data (multipart/form-data)
+
+<ParamField body="file" type="file" required>
+  ZIP archive (.zip). Maximum 50 MB. Must contain `mecapy.yml` at the root
+  (or inside a single wrapper directory).
+</ParamField>
+
+<ParamField body="deploy_strategy" type="string" default="all">
+  Deployment strategy: `all` or `selective`
+</ParamField>
+
+<ParamField body="functions" type="string">
+  Comma-separated function names (only used when `deploy_strategy=selective`)
+</ParamField>
+
+## Validation Rules
+
+| Condition | Status |
+| --- | --- |
+| Caller is the package owner | `403` otherwise |
+| Package exists | `404` otherwise |
+| Archive is a valid ZIP | `400` otherwise |
+| Archive is smaller than 50 MB | `413` otherwise |
+| Manifest name matches the existing package name | `409` otherwise |
+| Manifest version is strictly greater than current version (SemVer) | `409` otherwise |
+| Manifest version does not already exist for this package | `409` otherwise |
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.mecapy.com/packages/{package_id}/versions/from-zip \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@boulonnerie-v1.3.0.zip" \
+  -F "deploy_strategy=all"
+```
+
+```python Python
+with open("boulonnerie-v1.3.0.zip", "rb") as f:
+    response = requests.post(
+        f"https://api.mecapy.com/packages/{package_id}/versions/from-zip",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": f},
+        data={"deploy_strategy": "all"},
+    )
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success
+{
+  "package": {
+    "id": "8f3b…-abc",
+    "name": "boulonnerie",
+    "version": "1.3.0",
+    "status": "ready",
+    "git_url": null,
+    "git_ref": null,
+    "functions": [
+      { "name": "calcul-contrainte", "version": "1.3.0", "status": "ready" }
+    ]
+  },
+  "functions_deployed": 2,
+  "functions_updated": 0,
+  "functions_unchanged": 0
+}
+```
+
+```json 413 — archive too large
+{
+  "detail": "Archive too large (60 MB). Maximum is 50 MB."
+}
+```
+
+</ResponseExample>

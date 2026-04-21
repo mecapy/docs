@@ -124,6 +124,8 @@
         "api-reference/packages/list",
         "api-reference/packages/get",
         "api-reference/packages/deploy-from-git",
+        "api-reference/packages/update-from-git",
+        "api-reference/packages/update-from-zip",
         "api-reference/packages/execute",
         "api-reference/packages/update-visibility"
       ]

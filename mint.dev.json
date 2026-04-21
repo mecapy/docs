@@ -121,7 +121,9 @@
     {
       "group": "Packages",
       "pages": [
-        "api-reference/packages/deploy-from-git"
+        "api-reference/packages/deploy-from-git",
+        "api-reference/packages/update-from-git",
+        "api-reference/packages/update-from-zip"
       ]
     },
     {
