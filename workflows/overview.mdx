@@ -1,0 +1,99 @@
+---
+title: "Workflows overview"
+description: "Compose typed MecaPy functions into directed graphs — visual editor, typed connections, single-endpoint execution polling."
+---
+
+## What is a workflow?
+
+A **workflow** is a directed acyclic graph of functions, each backed by a
+specific, pinned `FunctionVersion`. The output of one node feeds the input of
+another through typed ports. Unconnected input ports become **free inputs** —
+the user supplies their values at run time.
+
+Workflows solve a recurring engineering need: the result that matters rarely
+comes out of a single function. A typical sizing problem reads like
+*"compute the wind load on a structure, feed it into a bolt sizing, then
+check the resulting shear stress"* — three functions chained end-to-end.
+
+## Key properties
+
+<CardGroup cols={2}>
+  <Card title="Typed connections" icon="shield-check">
+    Every edge is validated against the canonical
+    [type catalog](/workflows/type-system) at draw time. You cannot wire a
+    `Force` output into a `Length` input — the editor refuses it live.
+  </Card>
+  <Card title="Computed visibility" icon="eye">
+    A workflow's visibility is **not** declared — it is derived from the
+    visibility of every referenced package. Public everywhere ⇒ public.
+    Any private node ⇒ private.
+  </Card>
+  <Card title="Pinned versions" icon="anchor">
+    Each node freezes `(package_slug, function_name, package_version)` when
+    added. Updating the underlying package does not change the workflow —
+    reproducibility is first-class (FRO-pkg-05 applied to graphs).
+  </Card>
+  <Card title="Fail-fast" icon="triangle-exclamation">
+    If a node fails, every downstream node is cancelled. Independent
+    branches that were already running finish their current execution,
+    but no new job is submitted on them.
+  </Card>
+</CardGroup>
+
+## Anatomy of a workflow
+
+```text
+           ┌──────────┐
+ F1.force──┤  Bolt    ├── margin ─┐
+           └──────────┘           │     ┌──────────┐
+                                  ├─────┤ Validator│─── verdict
+           ┌──────────┐           │     └──────────┘
+ F1.area ──┤  Stress  ├── stress ─┘
+           └──────────┘
+```
+
+Three building blocks:
+
+- **Nodes** — one per function call. Carry a `node_key` (stable identifier)
+  and a pinned `function_version_id`.
+- **Edges** — directed, typed. Connect one output port to one input port.
+  Every input port can have at most one incoming edge.
+- **Free inputs** — input ports left unconnected. Filled at run time via
+  the aggregated [run form](/workflows/execution#submitting-a-run).
+
+## Scope — v1 vs later
+
+| Feature | v1 | v1.5 | v2 |
+|---------|----|------|-----|
+| DAG (parallel branches) | ✅ | | |
+| Visual editor (React Flow) | ✅ | | |
+| Typed connections with sous-typage | ✅ | | |
+| Fusion of same-package steps (one cold start per chain) | ✅ (plan) | ✅ (worker) | |
+| Warm pool | | ✅ (FRO-wkf-12) | |
+| Import / export YAML | | | ✅ (FRO-wkf-13) |
+| Logic nodes (if / loop) | | | ✅ (FRO-wkf-15) |
+| Meta-workflows | | | ✅ (FRO-wkf-14) |
+
+<Note>
+  **v1 SLO caveat.** Without a warm pool, each node pays one Python cold
+  start (~6 s). Chain fusion keeps a two-step same-package chain near the
+  single-node SLO, but a four-branch DAG of distinct packages will run in
+  ~20–30 s. See [execution internals](/workflows/execution#cost-model).
+</Note>
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Type system" icon="sitemap" href="/workflows/type-system">
+    Canonical catalog, sous-typage rules, composite types.
+  </Card>
+  <Card title="Visual editor" icon="diagram-project" href="/workflows/editor">
+    Palette, drag-and-drop, live edge validation, properties panel.
+  </Card>
+  <Card title="Running a workflow" icon="play" href="/workflows/execution">
+    Run submission, tick polling, terminal outputs, failure handling.
+  </Card>
+  <Card title="API reference" icon="code" href="/api-reference/workflows/list">
+    Endpoints for CRUD, versioning, runs, and live polling via `/tick`.
+  </Card>
+</CardGroup>

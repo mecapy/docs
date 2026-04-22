@@ -1,0 +1,161 @@
+---
+title: "Type system"
+description: "MecaPy canonical type catalog, sous-typage rules and composite types — the foundation of workflow connections."
+---
+
+## Why a type system?
+
+Workflows chain function outputs into other function inputs. Without a
+shared vocabulary for "what flows on this edge", the platform would have to
+choose between:
+
+- **Fully dynamic** — wire any output to any input, break at run time.
+- **Nominal types** — `Force` matches only `Force`, no flexibility, no
+  unit hint, no UI guidance.
+
+MecaPy takes a third path: a **canonical catalog** of types shared across
+packages, combined with a **sous-typage** rule (a.k.a. Liskov-style
+substitution) that makes typical engineering connections work with zero
+friction while still catching unit mismatches.
+
+## The canonical catalog
+
+<Note>
+  The catalog is **frozen** at the platform level — packages cannot invent
+  their own nominal types in v1. Requests for new canonical types go
+  through FRO-type-06 (planned v1.5).
+</Note>
+
+Types are grouped in three categories:
+
+### Primitives (5 types)
+
+| Type | Kind | Description |
+|------|------|-------------|
+| `Numeric` | scalar | Root of the numeric hierarchy. |
+| `Integer` | scalar | Whole numbers (extends `Numeric`). |
+| `Float` | scalar | Real numbers (extends `Numeric`). |
+| `Boolean` | scalar | `true` / `false`. |
+| `String` | scalar | Text. |
+
+### Physical quantities (17 types, SI units)
+
+All physical scalars extend `Float`.
+
+| Type | Unit | Type | Unit |
+|------|------|------|------|
+| `Length` | m | `Force` | N |
+| `Area` | m² | `Moment` | N·m |
+| `Volume` | m³ | `Pressure` | Pa |
+| `Mass` | kg | `Stress` | Pa |
+| `Density` | kg/m³ | `Temperature` | K |
+| `Time` | s | `Energy` | J |
+| `Frequency` | Hz | `Power` | W |
+| `Angle` | rad | `Velocity` | m/s |
+| | | `Acceleration` | m/s² |
+
+<Note>
+  **SI only.** MecaPy does not convert units. Declare everything in SI.
+  Providing a length in millimeters and connecting it to a `Length` port
+  is a silent bug — catch it in your function code, not through a type.
+</Note>
+
+### Composites (5 types)
+
+| Type | Shape | Typical use |
+|------|-------|-------------|
+| `Vector3` | `[x, y, z]` three `Float` | Positions, displacements. |
+| `Force3` | Three `Force` | Load at a node. |
+| `Moment3` | Three `Moment` | Bending moments. |
+| `Torsor` | `{force: Force3, moment: Moment3}` | Reactions, loads. |
+| `Matrix` | 2D array of `Float` | Stiffness, transforms. |
+
+## Sous-typage rule
+
+A connection from port `A.out` (type `S`) to port `B.in` (type `T`) is
+**allowed** iff `S` and `T` are on the same ancestor / descendant chain.
+
+```text
+ Numeric
+ ├── Integer
+ └── Float
+     ├── Length
+     ├── Force        ← siblings: incompatible
+     └── Stress
+```
+
+<CardGroup cols={2}>
+  <Card title="✅ Allowed" icon="check">
+    `Force → Float` (parent)<br/>
+    `Float → Force` (permissive descendant)<br/>
+    `Force → Numeric`<br/>
+    `Integer → Float`
+  </Card>
+  <Card title="❌ Refused" icon="xmark">
+    `Force → Length` (siblings)<br/>
+    `Length → Pressure` (siblings)<br/>
+    `String → Integer` (different roots)
+  </Card>
+</CardGroup>
+
+### Recursion for composites
+
+List and struct types apply the rule **element-wise**:
+
+- `list[Force] → list[Numeric]` ✅ (elements compatible)
+- `list[Force] → list[Length]` ❌ (siblings)
+- `Torsor → Torsor` ✅ (same composite)
+
+## Declaring types in your manifest
+
+Types are declared **explicitly** in `mecapy.yml` — auto-introspection
+is deliberately not used for workflow-eligible functions.
+
+```yaml
+name: bolt-sizing
+functions:
+  sizing:
+    handler: bolt:size
+    inputs:
+      force:
+        type: Force
+        description: Axial load
+        required: true
+      diameter:
+        type: Length
+        description: Nominal diameter
+    outputs:
+      margin:
+        type: Float
+        description: Safety margin
+```
+
+Without an `io_spec` block, the function is still deployable and
+executable standalone — but it **cannot be used as a workflow node**.
+The platform returns `400` at deploy time if a workflow references an
+untyped function.
+
+## Client-side pre-validation
+
+The editor calls `POST /types/check-connection` on every drag attempt
+before the edge is materialised:
+
+```bash
+curl -X POST https://api.mecapy.com/types/check-connection \
+  -H "Content-Type: application/json" \
+  -d '{"source": "Force", "target": "Length"}'
+# → { "compatibility": "REFUSED", "reason": "Force and Length are siblings under Float" }
+```
+
+The endpoint is **public** (no authentication) — newcomers can explore
+the catalog and test compatibility before signing up.
+
+## Fallbacks
+
+When the precise type is unknown, authors may fall back to:
+
+- `Numeric` — any number works.
+- `Float` — any real number (no integer guarantee).
+
+Both keep the connection valid against downstream typed ports thanks to
+the sous-typage rule, at the cost of letting unit errors through.

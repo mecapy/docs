@@ -31,6 +31,10 @@
       "url": "packages"
     },
     {
+      "name": "Workflows",
+      "url": "workflows"
+    },
+    {
       "name": "Architecture",
       "url": "architecture"
     },
@@ -80,6 +84,15 @@
         "packages/PACKAGE_MULTI_FUNCTIONS",
         "packages/VERSIONING_STRATEGY",
         "packages/VERSIONING_REFINED"
+      ]
+    },
+    {
+      "group": "Workflows",
+      "pages": [
+        "workflows/overview",
+        "workflows/type-system",
+        "workflows/editor",
+        "workflows/execution"
       ]
     },
     {

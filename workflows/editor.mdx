@@ -1,0 +1,135 @@
+---
+title: "Visual editor"
+description: "Compose your workflow in the React Flow canvas — palette, drag-drop, live edge validation, per-node properties and version pinning."
+---
+
+## Where to open it
+
+The editor lives at `/workflows/{slug}/edit` and is reached from:
+
+- The "Edit" click on a card in `/workflows`.
+- The "Create workflow" form, which redirects to the editor of the
+  freshly-created workflow.
+
+Direct URL works for bookmarks. `/workflows/{slug}` redirects to
+`/workflows/{slug}/edit` — there is no separate read-only detail page in
+v1.
+
+## Anatomy
+
+```text
+ ┌──────────┬─────────────────────────────────┬────────────────┐
+ │          │  Validate | Back | Save | Run   │                │
+ │ PALETTE  ├─────────────────────────────────┤   PROPERTIES   │
+ │          │                                 │                │
+ │ Packages │                                 │  (visible when │
+ │  ├ func  │         REACT FLOW CANVAS       │   a node is    │
+ │  ├ func  │                                 │    selected)   │
+ │          │                                 │                │
+ └──────────┴─────────────────────────────────┴────────────────┘
+```
+
+## Adding a node
+
+1. In the left **palette**, locate the function — they are grouped by
+   owning package. Only `ready` versions are displayed.
+2. **Drag** the function card onto the canvas. The drop position becomes
+   the node position.
+3. The new node is auto-named — `function_name` by default, with a
+   numeric suffix (`force-calc-2`) on collisions inside the same graph.
+
+<Note>
+  Nodes pin the **exact function version** selected from the palette
+  (FRO-wkf-05). Updating the package later does not touch this node.
+  To switch version, select the node and use the dropdown in the
+  properties panel.
+</Note>
+
+## Drawing edges
+
+- Click a source handle (right of a node), drag to a target handle
+  (left of another node), release.
+- The editor calls `POST /types/check-connection` **asynchronously**
+  before materialising the edge.
+
+### What happens on drop
+
+<CardGroup cols={2}>
+  <Card title="ALLOWED" icon="check">
+    Edge committed. Tooltip on hover shows the sous-typage reason —
+    `Force → Numeric` explains "Numeric is a descendant of Float".
+  </Card>
+  <Card title="REFUSED" icon="xmark">
+    Destructive toast surfaces `"Force → Length · …"`. The edge is
+    **not** added to the canvas; no DB state, no validation noise.
+  </Card>
+</CardGroup>
+
+The [type system reference](/workflows/type-system#sous-typage-rule)
+covers the exact rules.
+
+## Selecting a node — the properties panel
+
+Click a node. A right-hand panel opens with:
+
+| Field | Meaning |
+|-------|---------|
+| **Node key** (read-only) | The stable identifier used in edges and run outputs. |
+| **Display label** | Free-form override of the function name. Saved as `custom_label`. |
+| **Function version** | Dropdown listing every `ready` version of the same function. Switching **drops edges** whose ports no longer exist in the new signature (FRO-wkf-05). |
+| **Source package** | Link to `/packages/{id}` for the owning package. |
+
+Close the panel with the `×` button or click the canvas background.
+
+## Validate button
+
+`Validate` runs a **dry-run** of the full graph validation against
+`POST /workflows/{slug}/validate`. Unlike the save path, this endpoint:
+
+- Never persists anything, never creates a version.
+- Always returns `200 OK` with a structured report — even on errors.
+- Is **owner-only** (same rule as save).
+
+The dialog categorises issues:
+
+- **Cycles** — a → b → a paths.
+- **Subtyping violations** — per-edge reason.
+- **Duplicate target ports** — two edges pointing at the same input.
+- **Unknown source/target ports** — edge references a port that does
+  not exist in the current `io_spec`.
+- **Missing typed I/O** — nodes whose function has no `io_spec`.
+- **Unknown function versions / nodes** — dangling references.
+
+<Note>
+  The same JSON shape is emitted as the `detail` of a `409` response from
+  `POST /{slug}/versions`. Callers can reuse the same UI for both
+  surfaces — the frontend does exactly that.
+</Note>
+
+## Save a version
+
+`Save version` POSTs to `/workflows/{slug}/versions`. The backend runs
+the full validation; on success a new `version` (monotonic integer) is
+created and becomes `is_latest=true`. On validation failure the call
+returns `409` with the same report shape as `Validate`.
+
+Old versions are **immutable** and remain queryable — runs reference
+the version they were started against, not the current head.
+
+## Running a workflow
+
+The `Run` button is disabled while the canvas has no node or no version
+has ever been saved. When enabled, it navigates to
+`/workflows/{slug}/runs/new` — see
+[execution](/workflows/execution#submitting-a-run) for the full flow.
+
+## Not in v1
+
+Out of scope for the v1 editor — planned for v1.5 / v2:
+
+- **Auto-layout** — arrange nodes automatically (dagre / ELK).
+- **Undo / redo** — the editor is stateless between reloads for v1.
+- **Multi-selection & bulk operations.**
+- **Copy / paste of sub-graphs.**
+- **Logic nodes** — `if`, `for` (FRO-wkf-15).
+- **Import / export YAML** (FRO-wkf-13).
