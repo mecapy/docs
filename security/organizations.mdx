@@ -1,0 +1,53 @@
+---
+title: "Organizations"
+description: "Group users together, share packages as internal and manage member roles."
+---
+
+An **organization** groups several MecaPy users, typically collaborators from
+the same company. It defines the scope of the `internal` package visibility
+(see [Visibility](./visibility)) and governs member management.
+
+## Key concepts
+
+- A user can belong to **multiple organizations** simultaneously.
+- Two roles: **User** and **Admin**.
+- Invariant: an organization must always have **at least one Admin**. The last
+  Admin cannot be demoted or removed without promoting another first.
+
+## Creating an organization
+
+Any authenticated user can create one from `/organizations/new`. Provide:
+
+- **Display name** — free text shown in the UI (e.g. `Acme Corp`)
+- **Slug** — URL-safe unique identifier (e.g. `acme-corp`). Lowercase letters,
+  digits and dashes only.
+
+The creator is automatically added as **Admin**.
+
+## Roles
+
+| Role | Permissions |
+|------|-------------|
+| **User** | Browse and execute `internal` packages of the organization. Can create/own packages and attach them to the organization. |
+| **Admin** | All User permissions, **plus**: invite/remove members, change member roles, delete the organization, publish an organization's package (switch to `public`). |
+
+## Organization-scoped packages
+
+A package is always owned by a **user** (the "responsible"), and optionally
+rattached to an organization. The organization's only effects:
+
+1. Members can see the package in `internal` visibility.
+2. Admins can switch it to `public`.
+
+> Future versions will add **ownership transfer** (FRO-pkg-11 in our roadmap):
+> an org Admin will be able to transfer ownership to another member.
+
+## Deleting an organization
+
+Admins can delete their organization from its detail page:
+
+1. Open `/organizations/{slug}`
+2. Click **Delete organization** in the Danger zone
+3. Re-type the slug as confirmation (GitLab-style)
+4. The deletion is refused if any package is still attached — transfer or
+   archive packages first.

@@ -1,0 +1,62 @@
+---
+title: "Package Visibility"
+description: "Control who can see and execute your packages with private, internal and public visibility levels."
+---
+
+## Three visibility levels
+
+MecaPy packages have three visibility levels — like GitLab projects:
+
+| Value | Who can see / execute |
+|-------|-----------------------|
+| **private** | Only the package **owner**. |
+| **internal** | All members of the **owner's organization**. Requires the package to be attached to an organization. |
+| **public** | Anyone authenticated can execute. Anyone (even unauthenticated) can browse read-only. |
+
+`private` is the default when creating a new package.
+
+## Transition rules
+
+<Note>
+Only the package **owner** can normally change visibility. There is one exception:
+making a package **public** when it belongs to an organization requires an
+**Admin of that organization** — a safeguard against accidental public exposure.
+</Note>
+
+- **Personal packages** (no organization): owner can toggle between `private` and `public`.
+- **Organization packages** owned by a User: owner can toggle between `private` and `internal`.
+  An Admin of the organization is required to publish the package.
+- **Organization packages** owned by an Admin: free choice among all three.
+
+## Setting visibility
+
+### At deploy time
+
+Declare it in `mecapy.yml`:
+
+```yaml
+name: my-package
+version: 1.0.0
+visibility: internal   # private (default) | internal | public
+functions:
+  calc:
+    handler: module:calc
+```
+
+Attach to an organization when deploying:
+
+```bash
+curl -X POST "https://api.mecapy.com/packages/from-git?organization_slug=acme-corp" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"git_url": "...", "git_ref": "main"}'
+```
+
+### After deployment
+
+Use the `PATCH /packages/{id}/visibility` endpoint or the UI selector on the
+package detail page (`/packages/[id]`).
+
+## Migration note
+
+Packages existing before this feature was rolled out are automatically set to
+`private` (secure by default). Owners can re-publish them via the UI if desired.

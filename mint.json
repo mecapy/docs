@@ -119,6 +119,14 @@
       ]
     },
     {
+      "group": "Security & Visibility",
+      "pages": [
+        "security/visibility",
+        "security/organizations",
+        "security/permission-denied"
+      ]
+    },
+    {
       "group": "Packages",
       "pages": [
         "api-reference/packages/list",
@@ -128,6 +136,16 @@
         "api-reference/packages/update-from-zip",
         "api-reference/packages/execute",
         "api-reference/packages/update-visibility"
+      ]
+    },
+    {
+      "group": "Organizations",
+      "pages": [
+        "api-reference/organizations/create",
+        "api-reference/organizations/list",
+        "api-reference/organizations/get",
+        "api-reference/organizations/update-member",
+        "api-reference/organizations/delete"
       ]
     },
     {

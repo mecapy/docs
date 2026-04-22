@@ -1,0 +1,59 @@
+---
+title: "Permission Denied"
+description: "How MecaPy handles access control, including retroactive job filtering."
+---
+
+When you try to access a package, function or job you are not allowed to see,
+the API returns **HTTP 403** with a `PermissionDenied:` prefix in the detail
+message. The UI shows a dedicated "Access denied" page rather than a generic
+404.
+
+## When does it happen?
+
+- **Package detail** (`GET /packages/{id}`) of a package that is not visible to
+  you (e.g. private package of another user, internal package of an organization
+  you are not part of).
+- **Function execution** (`POST /packages/{id}/functions/{name}/execute`) on
+  such a package.
+- **Organization detail** (`GET /organizations/{slug}`) when you are not a
+  member.
+
+## Jobs: retroactive filtering
+
+<Warning>
+A job you submitted in the past may become inaccessible later if your access
+to the underlying package changes.
+</Warning>
+
+Concretely:
+
+- If a package you used becomes `private` (or had its visibility reduced), the
+  corresponding jobs are **filtered out of your `/jobs` list**.
+- Directly opening `/jobs/{id}` of such a job returns **403 PermissionDenied**.
+- If you lose membership of an organization, jobs you ran on that org's
+  `internal` packages become inaccessible the same way.
+
+This retroactive filtering is intentional — access rules are always evaluated
+against the current state, not the state at submission time.
+
+## Listings never leak
+
+The package and function listings (`GET /packages`, `GET /functions`) are
+filtered server-side: packages you cannot see simply do not appear. This means
+attackers cannot enumerate the listings to discover package IDs they shouldn't
+know about.
+
+If you already have an ID (e.g. from a link someone shared), the direct access
+returns `403 PermissionDenied` — but the listing never revealed it to you.
+
+## API signature
+
+```json
+HTTP/1.1 403 Forbidden
+{
+  "detail": "PermissionDenied: access denied to this package"
+}
+```
+
+The string prefix `PermissionDenied:` is stable and may be used by SDKs to
+distinguish permission errors from other 403 responses.

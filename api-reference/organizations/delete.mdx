@@ -1,0 +1,41 @@
+---
+title: "Delete Organization"
+api: "DELETE /organizations/{slug}"
+description: "Delete an organization. Admin-only. Requires slug confirmation."
+---
+
+<ParamField path="slug" type="string" required>
+  Organization slug.
+</ParamField>
+
+<ParamField body="confirm_slug" type="string" required>
+  Must match the organization slug exactly (GitLab-style confirmation).
+</ParamField>
+
+<Warning>
+The deletion is refused with HTTP 409 if any package is still attached to the
+organization. Transfer or archive packages first.
+</Warning>
+
+<ResponseExample>
+
+```bash
+curl -X DELETE https://api.mecapy.com/organizations/acme-corp \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"confirm_slug": "acme-corp"}'
+```
+
+```json 204
+(empty)
+```
+
+```json 409 Packages still attached
+{"detail": "Cannot delete organization: 3 package(s) still attached. Transfer or archive them first."}
+```
+
+```json 403 Not admin
+{"detail": "PermissionDenied: only an organization admin can delete the organization"}
+```
+
+</ResponseExample>

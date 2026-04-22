@@ -1,0 +1,45 @@
+---
+title: "Create Organization"
+api: "POST /organizations"
+description: "Create a new organization. The creator becomes its first Admin."
+---
+
+<ParamField body="display_name" type="string" required>
+  Human-readable organization name (1-100 chars).
+</ParamField>
+
+<ParamField body="slug" type="string" required>
+  URL-safe unique slug. Lowercase alphanumeric with optional dashes. 2-50 chars.
+</ParamField>
+
+<RequestExample>
+
+```bash
+curl -X POST https://api.mecapy.com/organizations \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"display_name": "Acme Corp", "slug": "acme-corp"}'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 201
+{
+  "id": "8f3c...",
+  "slug": "acme-corp",
+  "display_name": "Acme Corp",
+  "created_at": "2026-04-22T10:00:00",
+  "members": [{"user_id": "alice", "role": "admin", "joined_at": "..."}],
+  "member_count": 1,
+  "admin_count": 1,
+  "my_role": "admin"
+}
+```
+
+```json 409 Slug taken
+{"detail": "Slug 'acme-corp' is already taken"}
+```
+
+</ResponseExample>

@@ -1,16 +1,15 @@
 ---
 title: "Update Visibility"
 api: "PATCH /packages/{package_id}/visibility"
-description: "Change the visibility of a package (public or private)"
+description: "Change the visibility of a package (private / internal / public)"
 ---
 
-Update the visibility of a package without redeploying. Only the package owner can change visibility.
+Update the visibility of a package without redeploying. The `visibility` field
+in `mecapy.yml` sets the initial value at deploy time; use this endpoint to
+change it afterwards — for example, to publish a package after internal
+validation.
 
-The `visibility` field in `mecapy.yml` sets the initial value at deploy time. Use this endpoint to change it afterwards — for example, to publish a package after internal validation.
-
-<Note>
-  Requires authentication. Only the package owner can change visibility.
-</Note>
+See [Visibility](/security/visibility) for the transition rules.
 
 ## Path Parameters
 
@@ -20,54 +19,59 @@ The `visibility` field in `mecapy.yml` sets the initial value at deploy time. Us
 
 ## Request Body
 
-<ParamField body="is_public" type="boolean" required>
-  Set to `true` to make the package publicly visible, `false` to make it private.
+<ParamField body="visibility" type="string" required>
+  One of `private`, `internal`, `public`.
 </ParamField>
+
+<Note>
+- Only the **owner** can toggle between `private` and `internal` (on org packages)
+  or between `private` and `public` (on personal packages).
+- Transition **to `public`** for an organization-owned package requires an
+  **Admin of the organization**.
+- **`internal`** requires the package to be attached to an organization.
+</Note>
 
 <RequestExample>
 
-```bash Make public
-curl -X PATCH https://api.mecapy.com/packages/17ad586c-0579-48e9-ba00-dcf6668d648c/visibility \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+```bash Publish
+curl -X PATCH https://api.mecapy.com/packages/17ad.../visibility \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"is_public": true}'
+  -d '{"visibility": "public"}'
 ```
 
-```bash Make private
-curl -X PATCH https://api.mecapy.com/packages/17ad586c-0579-48e9-ba00-dcf6668d648c/visibility \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+```bash Make internal
+curl -X PATCH https://api.mecapy.com/packages/17ad.../visibility \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"is_public": false}'
-```
-
-```python Python
-response = requests.patch(
-    "https://api.mecapy.com/packages/17ad586c-0579-48e9-ba00-dcf6668d648c/visibility",
-    headers={"Authorization": f"Bearer {token}"},
-    json={"is_public": True},
-)
+  -d '{"visibility": "internal"}'
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json Success
+```json 200 Success
 {
-  "id": "17ad586c-0579-48e9-ba00-dcf6668d648c",
+  "id": "17ad...",
   "name": "e25-030-1",
   "version": "1.0.0",
-  "status": "ready",
-  "is_public": true,
-  "functions": [...],
-  "owner_id": "demo@mecapy.com"
+  "visibility": "public",
+  "organization_id": "8f3c...",
+  "functions": [...]
 }
 ```
 
-```json 403 Not owner
-{
-  "detail": "Only the package owner can change visibility"
-}
+```json 403 Non-admin publishing org package
+{"detail": "PermissionDenied: Only an organization admin can publish this package"}
+```
+
+```json 403 Not the owner
+{"detail": "PermissionDenied: Only the package owner can change visibility"}
+```
+
+```json 403 Internal on personal package
+{"detail": "PermissionDenied: Cannot set 'internal' on a personal package (no organization)"}
 ```
 
 </ResponseExample>

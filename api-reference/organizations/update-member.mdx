@@ -1,0 +1,38 @@
+---
+title: "Update Member Role"
+api: "PATCH /organizations/{slug}/members/{user_id}"
+description: "Promote a User to Admin or demote an Admin to User. Admin-only."
+---
+
+<ParamField path="slug" type="string" required>
+  Organization slug.
+</ParamField>
+
+<ParamField path="user_id" type="string" required>
+  User ID of the member to update.
+</ParamField>
+
+<ParamField body="role" type="string" required>
+  New role: `admin` or `user`.
+</ParamField>
+
+<Note>
+**Invariant**: an organization must always have at least one Admin. Demoting
+the last remaining Admin returns HTTP 409.
+</Note>
+
+<ResponseExample>
+
+```json 200
+{
+  "user_id": "bob",
+  "role": "admin",
+  "joined_at": "..."
+}
+```
+
+```json 409 Last admin
+{"detail": "The organization must have at least one administrator."}
+```
+
+</ResponseExample>

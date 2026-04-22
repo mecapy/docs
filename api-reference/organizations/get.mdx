@@ -1,0 +1,35 @@
+---
+title: "Get Organization"
+api: "GET /organizations/{slug}"
+description: "Full organization detail. Restricted to members."
+---
+
+<ParamField path="slug" type="string" required>
+  Organization slug.
+</ParamField>
+
+Returns 403 `PermissionDenied` if the caller is not a member.
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "8f3c...",
+  "slug": "acme-corp",
+  "display_name": "Acme Corp",
+  "created_at": "...",
+  "members": [
+    {"user_id": "alice", "role": "admin", "joined_at": "..."},
+    {"user_id": "bob",   "role": "user",  "joined_at": "..."}
+  ],
+  "member_count": 2,
+  "admin_count": 1,
+  "my_role": "user"
+}
+```
+
+```json 403
+{"detail": "PermissionDenied: you are not a member of this organization"}
+```
+
+</ResponseExample>
