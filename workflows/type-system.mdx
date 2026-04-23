@@ -159,3 +159,35 @@ When the precise type is unknown, authors may fall back to:
 
 Both keep the connection valid against downstream typed ports thanks to
 the sous-typage rule, at the cost of letting unit errors through.
+
+## Input nodes emit any TypeSpec
+
+A workflow `InputNode` (see the
+[visual editor](/workflows/editor#adding-an-input-node)) has a single
+output port named `value`. Its `input_spec.type_expr` accepts **any**
+TypeSpec the catalog parser understands, including:
+
+- a canonical name — `Force`, `Length`, `Stress`…
+- a homogeneous list — `list[Force]`, `list[Vector3]`
+- a homogeneous dict keyed by string — `dict[str, Length]`
+- an inline struct — `{"d": "Length", "p": "Length", "As": "Area"}`
+
+The struct form is the most powerful: one input node captures a whole
+business object (a bolt, an assembly, a load case) and can be wired to
+every function port that declares the **same struct shape**. Subtyping
+applies field-wise:
+
+```text
+ InputNode type_expr                 Function port type
+ {d: Length, p: Length}       →       {d: Length, p: Length}    ✅
+ {d: Length, p: Length}       →       {d: Length, p: Area}      ❌ p mismatch
+ {d: Length, p: Length, As: Area}  →  {d: Length, p: Length}    ❌ extra field
+```
+
+At run time the value is read verbatim from `run.inputs[node_key]` — no
+field-level indexation, no projection. Downstream functions receive the
+whole struct as declared.
+
+Invalid type expressions (malformed, referencing an unknown canonical
+name) surface as `invalid_input_node_types` in the validation report.
+

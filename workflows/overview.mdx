@@ -1,14 +1,14 @@
 ---
 title: "Workflows overview"
-description: "Compose typed MecaPy functions into directed graphs — visual editor, typed connections, single-endpoint execution polling."
+description: "Compose typed MecaPy functions into directed graphs — visual editor, explicit input nodes, typed connections, single-endpoint execution polling."
 ---
 
 ## What is a workflow?
 
 A **workflow** is a directed acyclic graph of functions, each backed by a
 specific, pinned `FunctionVersion`. The output of one node feeds the input of
-another through typed ports. Unconnected input ports become **free inputs** —
-the user supplies their values at run time.
+another through typed ports. Runtime values the user supplies are materialised
+as **input nodes** — typed nodes that sit in the graph like any other.
 
 Workflows solve a recurring engineering need: the result that matters rarely
 comes out of a single function. A typical sizing problem reads like
@@ -29,8 +29,8 @@ check the resulting shear stress"* — three functions chained end-to-end.
     Any private node ⇒ private.
   </Card>
   <Card title="Pinned versions" icon="anchor">
-    Each node freezes `(package_slug, function_name, package_version)` when
-    added. Updating the underlying package does not change the workflow —
+    Each function node freezes `(package_slug, function_name, package_version)`
+    when added. Updating the underlying package does not change the workflow —
     reproducibility is first-class (FRO-pkg-05 applied to graphs).
   </Card>
   <Card title="Fail-fast" icon="triangle-exclamation">
@@ -43,23 +43,52 @@ check the resulting shear stress"* — three functions chained end-to-end.
 ## Anatomy of a workflow
 
 ```text
-           ┌──────────┐
- F1.force──┤  Bolt    ├── margin ─┐
-           └──────────┘           │     ┌──────────┐
-                                  ├─────┤ Validator│─── verdict
-           ┌──────────┐           │     └──────────┘
- F1.area ──┤  Stress  ├── stress ─┘
-           └──────────┘
+  ╭──────────╮
+  │ I_bolt   │ (input: {d, p, As, Re_min})
+  ╰────┬─────╯                    ┌──────────┐
+       │                      ┌───┤  Bolt    ├── margin ─┐
+       ├──────────────────────┤   └──────────┘           │    ┌───────────┐
+       │                      │                          ├────┤ Validator │─ verdict
+  ╭────┴─────╮                │   ┌──────────┐           │    └───────────┘
+  │ I_loads  │                └───┤  Stress  ├── stress ─┘
+  ╰──────────┘                    └──────────┘
 ```
 
 Three building blocks:
 
-- **Nodes** — one per function call. Carry a `node_key` (stable identifier)
-  and a pinned `function_version_id`.
+- **Function nodes** — one per function call. Carry a `node_key` (stable
+  identifier) and a pinned `function_version_id`.
+- **Input nodes** — typed value sources. Declare a `label`, a `type_expr`
+  (any canonical type, including structs like `{d: Length, p: Length}`),
+  whether the value is required at submission. A single input node can feed
+  **many** function ports — that's how you share the same parameter across
+  two branches of the graph.
 - **Edges** — directed, typed. Connect one output port to one input port.
-  Every input port can have at most one incoming edge.
-- **Free inputs** — input ports left unconnected. Filled at run time via
-  the aggregated [run form](/workflows/execution#submitting-a-run).
+  Every input port receives exactly one incoming edge.
+
+<Note>
+  **Strict mode.** A valid workflow has **zero unconnected function inputs**.
+  Every input port of a function node must be wired — usually to an input
+  node, sometimes to an upstream function's output. The `validate` endpoint
+  reports any orphaned port as `unconnected_function_inputs`.
+</Note>
+
+## Input nodes — the shared-value lever
+
+Duplicating a compute node does not duplicate its inputs: the duplicate can
+either reuse the same input node (same value in both branches) or be wired
+to a new one (independent values). The graph itself is the source of truth
+for sharing — there is no hidden rule on top of the topology.
+
+Input nodes can emit any type from the catalog:
+
+- a primitive or physical scalar (`Force`, `Length`, `Moment`…)
+- a homogeneous list (`list[Force]`) or dict (`dict[str, Length]`)
+- a struct — typically the signature of a business object like a bolt
+  `{d: Length, p: Length, As: Area, Re_min: Stress, quality_class: String}`
+
+The run form generates one field group per input node and renders struct
+shapes recursively.
 
 ## Scope — v1 vs later
 
@@ -67,6 +96,7 @@ Three building blocks:
 |---------|----|------|-----|
 | DAG (parallel branches) | ✅ | | |
 | Visual editor (React Flow) | ✅ | | |
+| Explicit typed input nodes | ✅ | | |
 | Typed connections with sous-typage | ✅ | | |
 | Fusion of same-package steps (one cold start per chain) | ✅ (plan) | ✅ (worker) | |
 | Warm pool | | ✅ (FRO-wkf-12) | |
@@ -75,10 +105,11 @@ Three building blocks:
 | Meta-workflows | | | ✅ (FRO-wkf-14) |
 
 <Note>
-  **v1 SLO caveat.** Without a warm pool, each node pays one Python cold
-  start (~6 s). Chain fusion keeps a two-step same-package chain near the
-  single-node SLO, but a four-branch DAG of distinct packages will run in
-  ~20–30 s. See [execution internals](/workflows/execution#cost-model).
+  **v1 SLO caveat.** Without a warm pool, each function node pays one Python
+  cold start (~6 s). Input nodes are resolved at submission — they don't
+  pay any cold start. Chain fusion keeps a two-step same-package chain near
+  the single-node SLO, but a four-branch DAG of distinct packages will run
+  in ~20–30 s. See [execution internals](/workflows/execution#cost-model).
 </Note>
 
 ## Where to go next

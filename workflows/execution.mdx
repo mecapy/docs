@@ -1,35 +1,61 @@
 ---
 title: "Execution & SLO"
-description: "How workflow runs are scheduled and polled — tick endpoint, fail-fast semantics, chain fusion, and the cold-start caveat."
+description: "How workflow runs are scheduled and polled — input nodes, tick endpoint, fail-fast semantics, chain fusion, and the cold-start caveat."
 ---
 
 ## Submitting a run
 
-From the editor, `Run` navigates to `/workflows/{slug}/runs/new`. The
-page calls `GET /workflows/{slug}/versions/{version}/inputs` to discover
-**free inputs** — every declared input that is not connected to an
-upstream edge. Free inputs are grouped by node and rendered through the
-reusable `AutoForm` widget (one form per node) so the user fills every
-required value on a single screen.
+From the editor, `Run` navigates to `/workflows/{slug}/runs/new`. The page
+reads the workflow's latest version (`GET /workflows/{slug}`) and renders
+**one `AutoForm` per input node** — the graph itself lists every required
+value. Struct-typed inputs expand into nested field groups rendered by the
+same AutoForm widget.
 
-On submit the page flattens values as `"node_key.port_name" → value` and
-POSTs `/workflows/{slug}/runs`, then redirects to `/workflow-runs/{id}`.
+On submit the values are keyed by InputNode `node_key` and POSTed to
+`/workflows/{slug}/runs`. The page then redirects to
+`/workflow-runs/{id}` for live polling.
 
 ```bash
-curl -X POST https://api.mecapy.com/workflows/wind-to-bolt/runs \
+curl -X POST https://api.mecapy.com/workflows/bolted-joint/runs \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "inputs": {
-      "wind.speed": 25.0,
-      "bolt.diameter": 0.012
+      "bolt_input": {
+        "d": 12,
+        "p": 1.5,
+        "As": 84.3,
+        "Re_min": 640,
+        "quality_class": "8.8"
+      },
+      "assembly_input": {
+        "dh": 18,
+        "do": 13,
+        "Rc": 210,
+        "mu_p_min": 0.1
+      },
+      "loads_input": { "FA_max": 15000, "Ft_max": 3500 },
+      "tightening_input": {
+        "mu_tot_min": 0.08, "mu_tot_max": 0.14, "precision_class": "A"
+      }
     }
   }'
 ```
 
-The response carries the **freshly-frozen execution plan** and the
-initial `node_states` — every node in `pending`. No jobs have been
+The response carries the **freshly-frozen execution plan** and the initial
+`node_states` — every function node in `pending`. Input nodes do not appear
+in `node_states`: they are pre-resolved at submission and injected directly
+via `input_node` bindings on each downstream step. No worker jobs have been
 submitted yet: the run starts advancing on the first `/tick`.
+
+The submitted values are echoed back on `run.inputs` so the detail page can
+render an "Submitted inputs" card without a separate lookup.
+
+<Note>
+  **Required-ness.** An input node is required (and cannot be omitted in
+  `inputs`) iff `input_spec.required === true`. Missing required keys
+  return `422 { "detail": { "missing_required_inputs": [...] } }`.
+</Note>
 
 ## The tick loop
 
@@ -43,9 +69,10 @@ One call performs three phases atomically (one DB commit):
 
 1. **Reconcile running nodes** — poll Redis for every node currently
    `running`. Write outputs on success, record errors on failure.
-2. **Submit ready nodes** — every `pending` node whose dependencies are
-   all `success` has its inputs resolved (free values + upstream
-   outputs) and is pushed to the worker queue.
+2. **Submit ready nodes** — every `pending` function node whose upstream
+   function dependencies are all `success` has its inputs resolved and is
+   pushed to the worker queue. Input nodes do **not** count as
+   dependencies — they are always ready.
 3. **Finalise** — if a terminal condition is reached, update the
    run-level status (`completed` / `failed` / `cancelled`).
 
@@ -72,8 +99,8 @@ The runtime needed to drive a run comes from one of:
 
 ## Response shape
 
-`WorkflowRunResponse` returned by `/tick`, `GET /workflow-runs/{id}`
-and `POST /runs`:
+`WorkflowRunResponse` returned by `/tick`, `GET /workflow-runs/{id}` and
+`POST /runs`:
 
 ```json
 {
@@ -82,27 +109,47 @@ and `POST /runs`:
   "status": "running",
   "started_at": "2026-04-22T10:15:00Z",
   "completed_at": null,
+  "inputs": {
+    "bolt_input": { "d": 12, "p": 1.5, "As": 84.3, … },
+    "loads_input": { "FA_max": 15000, "Ft_max": 3500 }
+  },
   "terminal_outputs": null,
   "error_message": null,
   "first_failed_node_key": null,
   "plan_snapshot": { "chains": […], "waves": [["chain-0"], ["chain-1"]] },
   "node_states": {
-    "wind":  { "status": "success", "outputs": { "force": 1250.0 }, … },
-    "bolt":  { "status": "running", "job_id": "job-42", … },
-    "check": { "status": "pending" }
+    "check":        { "status": "running", "job_id": "job-42", … },
+    "min_preload":  { "status": "pending" }
   }
 }
 ```
 
-The **single-endpoint polling** guarantee (plan + node states in the
-same response) keeps the frontend DAG view in sync with one HTTP call
+The **single-endpoint polling** guarantee (plan + node states + inputs in
+the same response) keeps the frontend DAG view in sync with one HTTP call
 per tick.
+
+### Input bindings in `plan_snapshot`
+
+Each step's `input_bindings` map every declared function input port to one
+of three source types:
+
+- `{"source": "input_node", "input_key": "bolt_input", "from_port": "value"}`
+  — read `run.inputs["bolt_input"]` verbatim (primitive, list, or struct
+  alike).
+- `{"source": "edge", "from_node_key": "X", "from_port": "y"}` — read
+  `node_states["X"].outputs["y"]`. Used between chains.
+- `{"source": "chain", "from_node_key": "X", "from_port": "y"}` — same as
+  `edge` but the source lives in the same chain (fusion hint for v1.5
+  worker chain-exec).
+
+There is no "free" source anymore — strict mode guarantees every port is
+covered.
 
 ## Fail-fast semantics (FRO-wkf-07)
 
-When a node fails:
+When a function node fails:
 
-- Every **pending** node downstream of the failure is marked
+- Every **pending** function node downstream of the failure is marked
   `cancelled` — no new job is submitted for them.
 - **Running** nodes on independent branches keep running to completion
   — the spec deliberately lets parallel work finish to avoid wasted
@@ -123,16 +170,19 @@ When a node fails:
 
 ## Cost model — the cold-start caveat
 
-Each node pays one Python cold start when submitted. Empirically on
-Scaleway Serverless containers: ~6 s for a noop, ~9 s end-to-end
+Each function node pays one Python cold start when submitted. Empirically
+on Scaleway Serverless containers: ~6 s for a noop, ~9 s end-to-end
 (FRO-perf-01). A naive four-node chain would therefore take ~24 s
 minimum — which would make workflows dead-on-arrival for real use.
+
+Input nodes add **zero** cold-start cost — they are resolved in-process
+during submission.
 
 v1 mitigates this with one optimisation already wired in:
 
 <Note>
   **Chain fusion (FRO-wkf-09)** — the plan builder greedily groups
-  consecutive linear nodes that share the same `(package_id,
+  consecutive linear function nodes that share the same `(package_id,
   package_version_id)` into a single **chain**. In v1.5 with
   chain-exec in the worker, the whole chain runs in one container —
   one cold start instead of N.
@@ -158,10 +208,11 @@ finish.
 
 ## Terminal outputs
 
-A workflow run's "result" is the outputs of **terminal nodes** — nodes
-that no other node consumes. For the diamond above, `D`'s outputs are
-the run's `terminal_outputs`. Multiple sinks produce multiple terminal
-output groups keyed by `node_key`:
+A workflow run's "result" is the outputs of **terminal function nodes** —
+function nodes that no other node consumes. Input nodes are never
+terminal. For the diamond above, `D`'s outputs are the run's
+`terminal_outputs`. Multiple sinks produce multiple terminal output groups
+keyed by `node_key`:
 
 ```json
 {
@@ -186,7 +237,9 @@ During a run:
   current node states (audit / replay).
 - **Run detail page** — visual DAG at `/workflow-runs/{id}`, coloured
   by status (pending grey, running blue pulsing, success green,
-  failed red, cancelled amber).
+  failed red, cancelled amber). Also displays a "Submitted inputs" card
+  listing `run.inputs` for audit, and a "Terminal outputs" card on
+  completion.
 - **Runs list** — `/workflow-runs` with status filters for batch
   triage across all your runs.
 

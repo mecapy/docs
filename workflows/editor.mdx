@@ -1,6 +1,6 @@
 ---
 title: "Visual editor"
-description: "Compose your workflow in the React Flow canvas — palette, drag-drop, live edge validation, per-node properties and version pinning."
+description: "Compose your workflow in the React Flow canvas — palette, drag-drop, live edge validation, per-node properties, input nodes and version pinning."
 ---
 
 ## Where to open it
@@ -19,31 +19,75 @@ v1.
 
 ```text
  ┌──────────┬─────────────────────────────────┬────────────────┐
- │          │  Validate | Back | Save | Run   │                │
- │ PALETTE  ├─────────────────────────────────┤   PROPERTIES   │
+ │  PALETTE │ [Auto inputs] Validate|Save|Run │   PROPERTIES   │
+ │          ├─────────────────────────────────┤                │
+ │  INPUTS  │                                 │  (visible when │
+ │  ├ Force │                                 │   a node is    │
+ │  ├ Length│       REACT FLOW CANVAS         │    selected —  │
+ │  ├ …     │                                 │   branched by  │
+ │  └Custom…│                                 │   node kind)   │
  │          │                                 │                │
- │ Packages │                                 │  (visible when │
- │  ├ func  │         REACT FLOW CANVAS       │   a node is    │
- │  ├ func  │                                 │    selected)   │
- │          │                                 │                │
+ │ Packages │                                 │                │
+ │  ├ func  │                                 │                │
+ │  ├ func  │                                 │                │
  └──────────┴─────────────────────────────────┴────────────────┘
 ```
 
-## Adding a node
+## Adding an input node
 
-1. In the left **palette**, locate the function — they are grouped by
-   owning package. Only `ready` versions are displayed.
+The top of the palette is dedicated to input nodes. Two paths:
+
+1. **Type cards** — one draggable card per primitive and physical canonical
+   type (`Force`, `Length`, `Moment`, …). Drop on the canvas ⇒ a typed input
+   node appears with its label pre-filled (and editable later).
+2. **Custom…** button — opens a modal to declare any other shape:
+   - **Label** — displayed on the card and in the run form.
+   - **Type expression** — canonical name (`Force`), parameterised
+     (`list[Force]`, `dict[str, Length]`) or inline struct as JSON:
+     `{"d": "Length", "p": "Length", "As": "Area"}`.
+   - **Description** (optional) — renders under the field at run time.
+   - **Required at run submission** (toggle).
+
+Every input node has a single output port named `value`; edges from the
+node use that port.
+
+<Note>
+  Input nodes can feed **multiple** function ports. A single
+  `{d: Length, p: Length, As: Area, Re_min: Stress}` input can be wired
+  into every sizing function of a bolted-joint graph — that's the whole
+  point of the explicit-input model.
+</Note>
+
+## Adding a function node
+
+1. In the palette's package sections, locate the function — functions are
+   grouped by owning package. Only `ready` versions are displayed.
 2. **Drag** the function card onto the canvas. The drop position becomes
    the node position.
 3. The new node is auto-named — `function_name` by default, with a
    numeric suffix (`force-calc-2`) on collisions inside the same graph.
 
 <Note>
-  Nodes pin the **exact function version** selected from the palette
-  (FRO-wkf-05). Updating the package later does not touch this node.
-  To switch version, select the node and use the dropdown in the
+  Function nodes pin the **exact function version** selected from the
+  palette (FRO-wkf-05). Updating the package later does not touch this
+  node. To switch version, select the node and use the dropdown in the
   properties panel.
 </Note>
+
+## Auto-create inputs on drop
+
+The toolbar hosts an `Auto inputs` switch. When **on**, dropping a function
+node also creates:
+
+- One input node per input port declared on the function's `io_spec`.
+- Each input node is pre-typed from the port type (`Force`, struct, list…).
+- Edges are drawn automatically from each input node's `value` to the
+  matching function port.
+
+The auto-created input nodes are placed on the left of the function node,
+stacked vertically around the function's Y position. Left off, the user
+manually drags types from the palette — useful when you want to share an
+existing input node across two functions.
 
 ## Drawing edges
 
@@ -70,7 +114,10 @@ covers the exact rules.
 
 ## Selecting a node — the properties panel
 
-Click a node. A right-hand panel opens with:
+Click a node. A right-hand panel opens. The panel branches on the node's
+kind.
+
+### Function node panel
 
 | Field | Meaning |
 |-------|---------|
@@ -78,6 +125,16 @@ Click a node. A right-hand panel opens with:
 | **Display label** | Free-form override of the function name. Saved as `custom_label`. |
 | **Function version** | Dropdown listing every `ready` version of the same function. Switching **drops edges** whose ports no longer exist in the new signature (FRO-wkf-05). |
 | **Source package** | Link to `/packages/{id}` for the owning package. |
+
+### Input node panel
+
+| Field | Meaning |
+|-------|---------|
+| **Node key** (read-only) | Becomes the key of the run submission payload (`inputs[node_key]`). |
+| **Label** | Shown on the node card and as the title of the run-form card. |
+| **Type expression** | Textarea accepting a canonical name, a parameterised form, or struct JSON. Validated on blur — malformed JSON surfaces an inline error. |
+| **Description** | Optional free text rendered under the field at run time. |
+| **Required** | When off, the run form allows leaving the field blank and the function receives its default. |
 
 Close the panel with the `×` button or click the canvas background.
 
@@ -93,11 +150,16 @@ Close the panel with the `×` button or click the canvas background.
 The dialog categorises issues:
 
 - **Cycles** — a → b → a paths.
+- **Unconnected function inputs** — strict-mode violations: a function
+  port has no incoming edge. Wire an input node (or an upstream output)
+  to fix.
+- **Invalid input-node types** — a `type_expr` the catalog cannot parse.
 - **Subtyping violations** — per-edge reason.
 - **Duplicate target ports** — two edges pointing at the same input.
 - **Unknown source/target ports** — edge references a port that does
   not exist in the current `io_spec`.
-- **Missing typed I/O** — nodes whose function has no `io_spec`.
+- **Missing typed I/O** — function nodes whose pinned version has no
+  `io_spec`.
 - **Unknown function versions / nodes** — dangling references.
 
 <Note>
@@ -127,6 +189,8 @@ has ever been saved. When enabled, it navigates to
 
 Out of scope for the v1 editor — planned for v1.5 / v2:
 
+- **Visual struct builder** — structs are declared as JSON in the Custom
+  Input dialog; a field-by-field builder would be nicer.
 - **Auto-layout** — arrange nodes automatically (dagre / ELK).
 - **Undo / redo** — the editor is stateless between reloads for v1.
 - **Multi-selection & bulk operations.**
