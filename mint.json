@@ -80,10 +80,17 @@
       "group": "Package Development",
       "pages": [
         "packages/MANIFEST_FORMAT",
+        "manifest/runtime-modes",
         "packages/STANDARD_TYPES_GUIDE",
         "packages/PACKAGE_MULTI_FUNCTIONS",
         "packages/VERSIONING_STRATEGY",
         "packages/VERSIONING_REFINED"
+      ]
+    },
+    {
+      "group": "Runtime",
+      "pages": [
+        "runtime/contract"
       ]
     },
     {
@@ -136,7 +143,8 @@
       "pages": [
         "security/visibility",
         "security/organizations",
-        "security/permission-denied"
+        "security/permission-denied",
+        "security/code-scanning"
       ]
     },
     {

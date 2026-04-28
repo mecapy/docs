@@ -1,0 +1,69 @@
+---
+title: "Code scanning"
+description: "How MecaPy scans uploaded packages for dangerous APIs — AST for Python, regex for other text formats."
+---
+
+Every uploaded zip is scanned at deploy time for dangerous APIs that
+could escape the runtime sandbox. The scan happens **before** the
+zip is extracted to disk, so a malicious archive can't drop a payload
+even if it tries.
+
+## Dangerous APIs
+
+The denylist targets APIs that can shell out, exfiltrate data, or
+escape the network sandbox:
+
+- **Subprocess execution** — `os.system`, `os.popen`, `os.exec*`,
+  `os.spawn*`, `subprocess.run / call / Popen / check_output / check_call`
+- **Dynamic code** — `exec()`, `eval()`, `__import__()`
+- **Network** — imports of `socket`, `urllib`, `requests`, `httpx`
+- **Absolute path opens** — `open("/etc/...", ...)` literal path
+  (variable-path opens still pass; the workspace contract restricts
+  what user code can usefully read anyway)
+
+Path traversal via `../` is not on the regex denylist (false-positive
+magnet on natural prose). It is rejected at extraction time by a
+separate canonicalisation check.
+
+## Two scanning paths
+
+`.py` files and other text formats are handled differently:
+
+| Extension | Scanner | Why |
+|---|---|---|
+| `.py` | **AST** (Abstract Syntax Tree) | Strings, docstrings, and module docstrings are skipped natively — `ast.walk` does not descend into `ast.Constant` looking for `Call` or `Import`. |
+| `.md` `.txt` `.yaml` `.yml` `.json` `.js` `.mjs` `.ts` | **Regex** | Defence in depth. A user shipping Python code under a non-`.py` extension to bypass the AST scan still hits the regex denylist. |
+
+This split solves a real false-positive that bit users in early 2026:
+docstrings explaining *not* to call `subprocess.run(...)` were
+incorrectly flagged by the original regex-only scan. The AST path
+inspects only actual call sites and import statements, so reformulating
+prose is no longer required.
+
+## Syntax errors
+
+If `.py` source fails to parse (`SyntaxError`), the AST scanner emits
+a sentinel and the file falls back to the regex path with a warning
+logged server-side. This means an attacker can't ship intentionally
+broken Python to bypass scanning — they hit the regex denylist
+instead.
+
+## What's still hard for modes B/C
+
+In modes B/C the user code may need to invoke a real binary
+(`subprocess.run(["code_aster", ...])`). The AST scan still flags this
+at the call site, even if the wrapper is intended to run inside a
+custom Docker image where the call is legitimate.
+
+The future direction here is twofold:
+
+- **Per-package allow-listing** of specific call sites for B/C images.
+- **Mode-B trust boundary** — the user's `Dockerfile` *is* the trust
+  boundary in mode B. The wrapper never runs on the MecaPy host
+  outside the image, so blocking subprocess calls inside it is
+  belt-and-suspenders. A future revision may scope the denylist
+  differently per mode.
+
+For now, B/C wrappers that need to shell out should plan on either
+landing the real call inside an `ENTRYPOINT` script (not Python source
+the scanner inspects) or wait for the per-package allow-list.

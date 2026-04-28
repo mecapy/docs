@@ -1,0 +1,174 @@
+---
+title: "Runtime modes"
+description: "Three ways to ship a function — managed Python, custom Dockerfile, or pre-built image."
+---
+
+A package's `runtime:` block declares **how** the function code runs.
+Three modes are supported, distinguished by the discriminator
+`runtime.kind`:
+
+| `kind` | Use case | Build cost | Language |
+|---|---|---|---|
+| `python` (mode A) | Pure Python, no native dependency | None — MecaPy builds | Python only |
+| `dockerfile` (mode B) | Native deps, custom toolchain (Code_Aster, OpenFOAM, ...) | Build on first deploy | Any |
+| `image` (mode C) | Pre-built image already in a registry | None — pulled as-is | Any |
+
+All three share the same [runtime contract](/runtime/contract) — same
+workspace layout, same env vars, same progress / error / cancel
+semantics. The mode only changes who builds the image and which
+entrypoint the worker invokes.
+
+## Mode A — `python` (managed)
+
+The default. You ship `handler.py` (or a package directory) plus
+`mecapy.yml`. MecaPy builds a slim Python image, copies your code in,
+and runs it through a managed runner that handles all the I/O.
+
+```yaml mecapy.yml
+name: bolt-sizing
+runtime:
+  kind: python
+  version: "3.12"
+  requirements: false   # set true to install requirements.txt at build time
+
+functions:
+  sizing:
+    handler: bolts:size
+    resources:
+      cpu: 1
+      memory_mb: 512
+      timeout: 60
+```
+
+```python bolts.py
+def size(diameter_mm: float, load_n: float) -> dict:
+    return {"stress_mpa": load_n / (3.14 * (diameter_mm / 2) ** 2)}
+```
+
+The function signature drives input port introspection. The return
+type drives output ports. No file plumbing on your side.
+
+**When to pick this mode.** Pure Python with packaged scientific
+deps (NumPy / SciPy / Pandas / your own pure-Python). 90% of
+mechanical-sizing functions fit here.
+
+## Mode B — `dockerfile` (build custom)
+
+You ship a `Dockerfile` (and whatever build context it needs) plus
+`mecapy.yml`. MecaPy builds the image on first deploy and caches it
+for subsequent runs.
+
+```yaml mecapy.yml
+name: code-aster-thermal
+runtime:
+  kind: dockerfile
+  dockerfile: ./Dockerfile
+  context: .                # relative to repo root, optional, defaults to "."
+
+functions:
+  thermal-analysis:
+    entrypoint: ["/usr/bin/run-aster.sh", "--quick"]
+    resources:
+      cpu: 4
+      memory_mb: 8192
+      timeout: 1800
+    inputs_schema: { ... }   # required when no Python introspection
+    outputs_schema: { ... }
+```
+
+`entrypoint:` is the command the worker runs after staging
+`/workspace/in/`. Your script reads `in/data.json` + `in/files/` and
+writes `out/data.json` + `out/files/` per the
+[runtime contract](/runtime/contract).
+
+**When to pick this mode.** You need a non-Python toolchain, a native
+solver compiled from C/C++/Fortran, MPI, GPU, or any system package
+unavailable in mode A's base image.
+
+## Mode C — `image` (pre-built)
+
+You point to an image already published to a registry — `docker.io`,
+GitHub Container Registry, your private registry, etc. MecaPy pulls
+it once and runs it.
+
+```yaml mecapy.yml
+name: code-aster-mvp
+runtime:
+  kind: image
+  image: ghcr.io/myorg/code-aster:15.4   # full reference with tag
+
+functions:
+  thermal-analysis:
+    entrypoint: ["/opt/aster/run.sh"]
+    resources: { cpu: 4, memory_mb: 8192, timeout: 1800 }
+    inputs_schema: { ... }
+    outputs_schema: { ... }
+```
+
+The image must already implement the contract — read `in/`, write
+`out/`. There's no MecaPy code injected at runtime in this mode.
+
+**When to pick this mode.** You already publish the image elsewhere
+(internal CI, vendor distribution) and don't want to maintain the
+manifest's build context.
+
+## Per-function entrypoint (modes B/C)
+
+In modes B/C, each function declares its own `entrypoint:` — the same
+image can host multiple commands:
+
+```yaml
+runtime:
+  kind: image
+  image: ghcr.io/myorg/solver:latest
+
+functions:
+  thermal:
+    entrypoint: ["/opt/run.sh", "--mode=thermal"]
+  mechanical:
+    entrypoint: ["/opt/run.sh", "--mode=mechanical"]
+```
+
+The image is pulled (or built) **once**; both functions reuse the
+same image with different argv at exec time.
+
+## Schemas in modes B/C
+
+Mode A introspects type hints. Modes B/C have no Python signature to
+read, so input/output schemas must be declared explicitly:
+
+```yaml
+functions:
+  thermal-analysis:
+    entrypoint: ["/usr/bin/run-aster.sh"]
+    inputs_schema:
+      type: object
+      properties:
+        mesh_file: { type: string, format: binary }
+        thermal_load: { type: number }
+      required: [mesh_file, thermal_load]
+    outputs_schema:
+      type: object
+      properties:
+        max_stress_mpa: { type: number }
+```
+
+The schemas drive the workflow editor's typing and the AutoForm UI.
+They are also what the worker uses to decide what goes into
+`in/data.json` vs. `in/files/`.
+
+## Deploy vs. run status
+
+The deploy path supports all three modes — `POST /packages/from-git`
+(or `from-zip`) accepts any `runtime.kind`, persists the
+mode-specific fields (handler vs. entrypoint, dockerfile path,
+image_ref), and returns the FunctionVersion as usual.
+
+<Note>
+  **Run status as of session 33.** Mode A is fully wired end-to-end
+  (build, run, workflows). Modes B and C deploy successfully but the
+  worker doesn't yet build/pull and run their images — invoking them
+  returns `501 Not Implemented` with a hint pointing here. The wiring
+  on the worker side is the next planned phase; the runtime contract
+  is already complete and host-side enforced for all three modes.
+</Note>

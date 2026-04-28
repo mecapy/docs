@@ -1,0 +1,227 @@
+---
+title: "Runtime contract"
+description: "The file/env/signal contract every MecaPy function image runs against — language-agnostic, host-side enforced."
+---
+
+The runtime contract is the **language-agnostic boundary** between the
+MecaPy worker (host) and the user code that runs inside the container.
+Everything passes through well-known files, env vars, and Unix signals —
+no Python library is required at the boundary, which is what allows
+modes B (`runtime.kind: dockerfile`) and C (`runtime.kind: image`) to
+ship images written in any language.
+
+A future `mecapy-runtime` SDK will sugar this contract for Python users,
+but the contract below is what the worker actually enforces and is the
+source of truth.
+
+## Workspace layout
+
+Inside the container, `/workspace/` is the entirety of MecaPy's API:
+
+```text
+/workspace/
+├── in/
+│   ├── data.json              # scalar inputs (str/int/float/bool/dict/list)
+│   └── files/
+│       └── <var>.<ext>        # one file per File-typed input port
+├── out/
+│   ├── data.json              # scalar outputs (function return value)
+│   ├── files/
+│   │   ├── list.json          # {required: [...], optional: [...]} — DO NOT WRITE
+│   │   └── <var>.<ext>        # one file per File-typed output port
+│   ├── artifacts/             # free-form, auto-uploaded to S3 post-exec
+│   ├── progress.jsonl         # progress events, one JSON dict per line
+│   ├── _runner_error.json     # mode A only — written by runner.py on uncaught exc
+│   └── _error.json            # modes B/C — write here on failure if you can
+└── scratch/                   # ephemeral writable space — wiped between runs
+```
+
+**Boundaries.**
+
+- `out/files/list.json` is written by MecaPy **before** your code starts
+  and read by MecaPy **after**. Don't touch it.
+- `out/artifacts/` is read once at the end and uploaded as-is. MecaPy
+  does no validation.
+- `scratch/` is yours. Use it for intermediate files; it disappears
+  between runs even on cached containers.
+
+## Inputs
+
+`in/data.json` is a JSON object keyed by input-port name. Only
+non-File ports show up here.
+
+```json
+{ "diameter_mm": 12.0, "load_n": 15000, "material": "8.8" }
+```
+
+`in/files/` contains one file per File-typed input. The variable name
+is the file **stem** (extension stripped). For an input port called
+`mesh` of type `File`, MecaPy writes `in/files/mesh.csv` (or
+`mesh.med`, `mesh.zip`, …) — your code receives the extension verbatim.
+
+A given key never appears in both `data.json` and `in/files/` for the
+same run.
+
+## Outputs
+
+`out/data.json` is the scalar return value. Mode A's `runner.py` writes
+this for you (it serialises the handler's return). In modes B/C you
+write it yourself:
+
+```json
+{ "stress_mpa": 245.7, "margin": 1.32 }
+```
+
+`out/files/<var>.<ext>` — one file per File-typed output port declared
+by the function. Required vs. optional is in `out/files/list.json`,
+read it if you want to know what's expected. The worker validates that
+every `required` name shows up; missing files raise an error.
+
+`out/artifacts/` is free-form. Anything you drop there is uploaded to
+S3 after a successful run. Filenames are preserved (extensions kept).
+The worker injects an `_artifacts` block in the response so downstream
+workflow nodes can resolve the references:
+
+```json
+{
+  "stress_mpa": 245.7,
+  "_artifacts": {
+    "report.pdf": {
+      "uri": "s3://bucket/artifacts/<fn-id>/<version>/report.pdf",
+      "size": 184321,
+      "sha256": "8f7a3…"
+    }
+  }
+}
+```
+
+You don't need S3 credentials — the worker handles the upload. Just
+drop the file.
+
+## Resource introspection
+
+Three environment variables are injected at container creation:
+
+| Variable | Value | Notes |
+|---|---|---|
+| `MECAPY_CPU_LIMIT` | `"1"`, `"2"`, … | CPU count allocated. |
+| `MECAPY_MEM_LIMIT_MB` | `"512"`, `"2048"`, … | Memory limit in MiB. |
+| `MECAPY_SCRATCH` | `/workspace/scratch` | Writable scratch dir path. |
+
+Read these instead of cgroup files — they are portable across cgroup
+v1/v2 and any future runtime change. Use them to size thread pools,
+tile sizes, batch sizes — anything that should track the actual budget
+the worker handed you.
+
+```bash
+# bash
+n=$(echo "$MECAPY_CPU_LIMIT")
+mpiexec -n "$n" my_solver
+```
+
+```python
+import os
+n_workers = int(os.environ["MECAPY_CPU_LIMIT"])
+```
+
+## Progress reporting
+
+Append one JSON object per line to `/workspace/out/progress.jsonl`:
+
+```jsonl
+{"step": 1, "total": 5, "message": "loading mesh"}
+{"step": 2, "total": 5, "message": "assembling stiffness"}
+{"step": 3, "total": 5, "message": "solving"}
+```
+
+The worker tails the file during execution, parses each newline-
+terminated line, and forwards the events to the API. The workflow run
+page surfaces them live.
+
+**Trade-offs to be aware of:**
+
+- **Lines without a final newline are held over** for the next drain.
+  Always end each line with `\n` (or write+flush an explicit newline).
+- The worker drains progress between log chunks — a fully silent job
+  (no stdout) only flushes its progress on exit. Print or log
+  occasionally if you want live progress.
+- Malformed JSON lines are logged and skipped on the worker side; the
+  rest of the run continues normally.
+- The schema is open: `step`/`total`/`message` is conventional but the
+  worker doesn't enforce the keys, it forwards the dict as-is.
+
+## Failure reporting
+
+If your code crashes hard (stdout/stderr unparseable, no scalar
+outputs, etc.), write a structured error to `/workspace/out/_error.json`
+**before** your process exits non-zero:
+
+```json
+{
+  "error": "code_aster failed to converge",
+  "type": "SolverDivergence",
+  "traceback": "…",
+  "ts": "2026-04-28T10:15:00Z"
+}
+```
+
+When the worker sees a non-zero exit code, it looks up:
+
+1. `out/_runner_error.json` — written by mode A's `runner.py` from its
+   top-level exception handler (you don't write this in B/C).
+2. `out/_error.json` — modes B/C convention.
+3. Falls back on the last lines of stderr otherwise.
+
+Surface as much context as you can. The API renders the JSON payload
+verbatim on the run detail page — a one-line `error` field beats a
+generic stack trace every time.
+
+## Cancellation
+
+When a workflow run is cancelled or the worker decides to abort, your
+process receives a **SIGTERM**. After a configurable grace period
+(default 5 s) the worker escalates to **SIGKILL**.
+
+Use the grace period to:
+
+- Flush any partial outputs you can (`out/data.json` with a "partial"
+  flag, partial files under `out/files/`, debug dumps under
+  `out/artifacts/` or `out/_error.json`).
+- Tear down sub-processes cleanly. A naked `subprocess.Popen` will
+  outlive your wrapper and become a zombie if you don't propagate the
+  signal.
+
+```python
+import signal
+
+def graceful_shutdown(signum, frame):
+    # save what we have, then exit
+    flush_partial_outputs()
+    raise SystemExit(143)
+
+signal.signal(signal.SIGTERM, graceful_shutdown)
+```
+
+Silent jobs (no log output) won't be cancelled instantly — the worker
+polls between log chunks. Print or log occasionally if your job needs
+to be cancellable mid-computation.
+
+## Mode-by-mode summary
+
+| Concern | Mode A (`python`) | Mode B (`dockerfile`) | Mode C (`image`) |
+|---|---|---|---|
+| Image | MecaPy-built from your `handler.py` | Built from your `Dockerfile` | Pulled from registry as-is |
+| Entrypoint | `runner.py` (handles I/O) | Your `entrypoint:` from manifest | Your `entrypoint:` from manifest |
+| `in/data.json` | Read by `runner.py` → kwargs | You read it | You read it |
+| `out/data.json` | Written by `runner.py` from return value | You write it | You write it |
+| `_runner_error.json` | Written by `runner.py` on uncaught exc | n/a | n/a |
+| `_error.json` | n/a (use exceptions) | You write it on failure | You write it on failure |
+| Resource env vars | ✓ | ✓ | ✓ |
+| `progress.jsonl` | ✓ | ✓ | ✓ |
+| Artifacts auto-upload | ✓ | ✓ | ✓ |
+| SIGTERM grace | ✓ | ✓ | ✓ |
+
+Modes B and C are run-blocked at the moment of writing — see the
+[manifest runtime modes](/manifest/runtime-modes) page for the deploy
+status. The contract above is the target shape; mode A already
+implements every row.
