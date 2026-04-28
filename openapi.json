@@ -3,7 +3,7 @@
   "info": {
     "title": "MecaPy API",
     "description": "API for MecaPy with Keycloak authentication and database persistence",
-    "version": "0.1.2.post117.dev0+e3a8140"
+    "version": "0.1.2"
   },
   "paths": {
     "/function-versions/{function_version_id}": {
