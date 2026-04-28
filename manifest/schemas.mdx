@@ -1,528 +1,216 @@
 ---
-title: 'Schemas & Auto-introspection'
-description: 'Comment MecaPy génère automatiquement les schemas de validation'
+title: "Typed I/O ports"
+description: "Declaring inputs and outputs in mecapy.yml — the foundation of workflow typing."
 ---
 
-## Principe
+Each function exposes named **input** and **output** ports. Ports
+carry types from the [canonical catalog](/workflows/type-system); the
+workflow editor uses them to validate connections at draw time, and
+the worker uses them to route values into the right slots inside the
+container.
 
-MecaPy **génère automatiquement** les schemas de validation JSON depuis votre code Python.
+## Declaration shape
 
-<Note>
-  **Pas besoin de spécifier les schemas manuellement** dans 90% des cas !
-</Note>
+`inputs:` and `outputs:` under a function are dicts where each key is
+a port name and each value describes the port:
 
-## Ce qui est généré
-
-<CardGroup cols={2}>
-  <Card title="Input schemas" icon="arrow-right-to-bracket">
-    Depuis les **type hints** et **Pydantic Field**
-  </Card>
-  <Card title="Output schemas" icon="arrow-left-from-bracket">
-    Depuis les **TypedDict** et type hints de retour
-  </Card>
-  <Card title="Descriptions" icon="file-lines">
-    Depuis les **docstrings NumPy**
-  </Card>
-  <Card title="Validation" icon="shield-check">
-    Depuis les **contraintes Pydantic** (ge, le, pattern...)
-  </Card>
-</CardGroup>
-
-## Input Schemas
-
-### Type hints de base
-
-MecaPy utilise vos type hints Python pour générer les schemas.
-
-<CodeGroup>
-
-```python code.py
-def calculer(force: float, diametre: float) -> float:
-    """Calcule la contrainte."""
-    return force / (3.14 * (diametre/2)**2)
-```
-
-```json Schema généré
-{
-  "type": "object",
-  "properties": {
-    "force": {
-      "type": "number",
-      "description": "Force appliquée"
-    },
-    "diametre": {
-      "type": "number",
-      "description": "Diamètre"
-    }
-  },
-  "required": ["force", "diametre"]
-}
-```
-
-</CodeGroup>
-
-### Mapping des types
-
-| Type Python | Type JSON Schema |
-|-------------|------------------|
-| `int` | `integer` |
-| `float` | `number` |
-| `str` | `string` |
-| `bool` | `boolean` |
-| `list` | `array` |
-| `dict` | `object` |
-
-### Contraintes avec Pydantic Field
-
-Pour ajouter des **contraintes de validation** :
-
-<CodeGroup>
-
-```python code.py
-from typing import Annotated
-from pydantic import Field
-
-def calculer(
-    force: Annotated[float, Field(
-        description="Force appliquée en Newton",
-        ge=0,           # Greater or Equal (≥ 0)
-        le=500000,      # Less or Equal (≤ 500000)
-        examples=[1000, 5000, 10000]
-    )],
-    diametre: Annotated[float, Field(
-        description="Diamètre de la vis en mm",
-        ge=3,
-        le=100,
-        examples=[6, 8, 10, 12, 16]
-    )]
-) -> float:
-    """Calcule la contrainte de traction."""
-    return force / (3.14 * (diametre/2)**2)
-```
-
-```json Schema généré
-{
-  "type": "object",
-  "properties": {
-    "force": {
-      "type": "number",
-      "description": "Force appliquée en Newton",
-      "minimum": 0,
-      "maximum": 500000,
-      "examples": [1000, 5000, 10000]
-    },
-    "diametre": {
-      "type": "number",
-      "description": "Diamètre de la vis en mm",
-      "minimum": 3,
-      "maximum": 100,
-      "examples": [6, 8, 10, 12, 16]
-    }
-  },
-  "required": ["force", "diametre"]
-}
-```
-
-</CodeGroup>
-
-<Tip>
-  MecaPy **valide automatiquement** ces contraintes avant d'appeler votre fonction !
-</Tip>
-
-### Contraintes disponibles
-
-| Contrainte | Description | Exemple |
-|------------|-------------|---------|
-| `ge` | Greater or Equal (≥) | `ge=0` |
-| `le` | Less or Equal (≤) | `le=100` |
-| `gt` | Greater Than (>) | `gt=0` |
-| `lt` | Less Than (&lt;) | `lt=100` |
-| `min_length` | Longueur minimale (string/array) | `min_length=3` |
-| `max_length` | Longueur maximale (string/array) | `max_length=50` |
-| `pattern` | Regex pattern (string) | `pattern="^[A-Z]{3}$"` |
-| `examples` | Exemples de valeurs | `examples=[10, 20]` |
-
-### Validation avec pattern
-
-<CodeGroup>
-
-```python code.py
-from typing import Annotated
-from pydantic import Field
-
-def analyser_designation(
-    designation: Annotated[str, Field(
-        description="Désignation de vis (M6, M8, M12...)",
-        pattern="^M[0-9]{1,2}$",
-        examples=["M6", "M8", "M12", "M16"]
-    )]
-) -> dict:
-    """Analyse la désignation d'une vis."""
-    diametre = int(designation[1:])
-    return {"diametre": diametre, "type": "metrique"}
-```
-
-```json Schema généré
-{
-  "type": "object",
-  "properties": {
-    "designation": {
-      "type": "string",
-      "description": "Désignation de vis (M6, M8, M12...)",
-      "pattern": "^M[0-9]{1,2}$",
-      "examples": ["M6", "M8", "M12", "M16"]
-    }
-  },
-  "required": ["designation"]
-}
-```
-
-</CodeGroup>
-
-### Paramètres optionnels
-
-Utilisez des valeurs par défaut :
-
-<CodeGroup>
-
-```python code.py
-def calculer(
-    force: float,
-    diametre: float,
-    coefficient: float = 1.5  # Optionnel avec défaut
-) -> float:
-    """Calcule avec coefficient de sécurité."""
-    return (force / (3.14 * (diametre/2)**2)) / coefficient
-```
-
-```json Schema généré
-{
-  "type": "object",
-  "properties": {
-    "force": {"type": "number"},
-    "diametre": {"type": "number"},
-    "coefficient": {
-      "type": "number",
-      "default": 1.5
-    }
-  },
-  "required": ["force", "diametre"]
-  // coefficient n'est PAS requis
-}
-```
-
-</CodeGroup>
-
-## Output Schemas
-
-### Type hints simples
-
-<CodeGroup>
-
-```python code.py
-def add(x: float, y: float) -> float:
-    """Additionne deux nombres."""
-    return x + y
-```
-
-```json Schema généré
-{
-  "type": "number"
-}
-```
-
-</CodeGroup>
-
-### TypedDict pour structures
-
-Pour des retours **structurés**, utilisez `TypedDict` :
-
-<CodeGroup>
-
-```python code.py
-from typing import TypedDict, Literal
-
-class ResultatCalcul(TypedDict):
-    """Résultat d'un calcul de contrainte."""
-    contrainte: float
-    statut: Literal["OK", "LIMITE", "RUPTURE"]
-    coefficient_securite: float
-    unite: str
-
-def analyser(force: float, resistance: float) -> ResultatCalcul:
-    """
-    Analyse structurelle.
-
-    Parameters
-    ----------
-    force : float
-        Force appliquée
-    resistance : float
-        Résistance du matériau
-
-    Returns
-    -------
-    ResultatCalcul
-        Résultat d'analyse avec statut
-    """
-    contrainte = force / resistance
-    coef = resistance / force
-
-    if coef >= 2:
-        statut = "OK"
-    elif coef >= 1.5:
-        statut = "LIMITE"
-    else:
-        statut = "RUPTURE"
-
-    return {
-        "contrainte": contrainte,
-        "statut": statut,
-        "coefficient_securite": coef,
-        "unite": "MPa"
-    }
-```
-
-```json Schema généré
-{
-  "type": "object",
-  "properties": {
-    "contrainte": {
-      "type": "number"
-    },
-    "statut": {
-      "type": "string",
-      "enum": ["OK", "LIMITE", "RUPTURE"]
-    },
-    "coefficient_securite": {
-      "type": "number"
-    },
-    "unite": {
-      "type": "string"
-    }
-  },
-  "required": [
-    "contrainte",
-    "statut",
-    "coefficient_securite",
-    "unite"
-  ]
-}
-```
-
-</CodeGroup>
-
-<Tip>
-  `Literal` génère automatiquement un `enum` dans le schema !
-</Tip>
-
-## Descriptions avec docstrings
-
-MecaPy extrait les descriptions depuis les **docstrings NumPy**.
-
-<CodeGroup>
-
-```python code.py
-def calculer_contrainte(force: float, diametre: float) -> dict:
-    """
-    Calcule la contrainte de traction dans une vis.
-
-    Cette fonction utilise la formule de RDM classique pour
-    calculer la contrainte normale de traction.
-
-    Parameters
-    ----------
-    force : float
-        Force de traction appliquée sur la vis, en Newton.
-        Doit être positive.
-    diametre : float
-        Diamètre nominal de la vis en millimètres.
-        Généralement entre 3 et 100 mm.
-
-    Returns
-    -------
-    dict
-        Dictionnaire contenant :
-        - contrainte : Contrainte calculée en MPa
-        - aire : Aire de la section en mm²
-    """
-    aire = 3.14 * (diametre / 2) ** 2
-    contrainte = force / aire
-    return {"contrainte": contrainte, "aire": aire}
-```
-
-```json Descriptions extraites
-{
-  "function_description": "Calcule la contrainte de traction dans une vis. Cette fonction utilise la formule de RDM classique...",
-  "parameters": {
-    "force": "Force de traction appliquée sur la vis, en Newton. Doit être positive.",
-    "diametre": "Diamètre nominal de la vis en millimètres. Généralement entre 3 et 100 mm."
-  },
-  "returns": "Dictionnaire contenant : - contrainte : Contrainte calculée en MPa - aire : Aire de la section en mm²"
-}
-```
-
-</CodeGroup>
-
-### Format docstring NumPy
-
-```python
-def ma_fonction(param1: type1, param2: type2) -> return_type:
-    """
-    Description courte de la fonction.
-
-    Description détaillée optionnelle sur plusieurs lignes.
-
-    Parameters
-    ----------
-    param1 : type1
-        Description de param1.
-        Peut être sur plusieurs lignes.
-    param2 : type2
-        Description de param2
-
-    Returns
-    -------
-    return_type
-        Description du retour
-    """
-```
-
-<Note>
-  Le format **NumPy docstring** est recommandé pour une extraction optimale des descriptions.
-</Note>
-
-## Overrides manuels
-
-Dans de rares cas (< 10%), vous pouvez override les schemas :
-
-```yaml mecapy.yml
+```yaml
 functions:
-  fonction-complexe:
-    handler: module:advanced
-    # Override manuel du schema d'entrée
-    inputs_schema:
-      type: object
-      properties:
-        custom_field:
-          type: string
-          pattern: "^CUSTOM-[0-9]{4}$"
-      required: [custom_field]
-    # Output schema reste auto-généré ✅
+  size:
+    handler: bolts:size
+    inputs:
+      diameter:
+        type: Length
+        description: "Bolt nominal diameter in metres."
+        required: true            # default: true
+      load:
+        type: Force
+        required: false           # optional input
+    outputs:
+      stress:
+        type: Stress
+        description: "Von Mises equivalent stress."
+      report:
+        type: File[pdf]
+        required: false           # File outputs may be optional
 ```
 
-<Warning>
-  N'utilisez les overrides que si l'auto-introspection ne suffit vraiment pas. Privilégiez toujours les type hints Python.
-</Warning>
+Each entry has the same shape:
 
-## Exemples complets
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `type` | string or mapping | yes | Type expression — see below. |
+| `description` | string | no | Free text, surfaced in the editor and AutoForm. |
+| `required` | boolean | no | Defaults to `true`. See semantics below. |
 
-<AccordionGroup>
-  <Accordion title="Validation simple avec contraintes">
-    ```python
-    from typing import Annotated
-    from pydantic import Field
+The port name is the dict key — it must be a non-empty string,
+typically `snake_case`. It becomes the keyword argument the runner
+passes to your handler in mode A, and the JSON key in
+`/workspace/in/data.json` in modes B/C.
 
-    def calculer_surface(
-        longueur: Annotated[float, Field(ge=0, le=1000)],
-        largeur: Annotated[float, Field(ge=0, le=1000)]
-    ) -> float:
-        """Calcule la surface d'un rectangle."""
-        return longueur * largeur
-    ```
+## Type expressions
 
-    ✅ Génère automatiquement :
-    - Type : `number`
-    - Contraintes : minimum 0, maximum 1000
-    - Validation : MecaPy rejette les valeurs hors limites
-  </Accordion>
+Every `type:` value is parsed against the
+[type catalog](/workflows/type-system). The parser accepts:
 
-  <Accordion title="Retour structuré avec TypedDict">
-    ```python
-    from typing import TypedDict, Literal
+### Nominal types
 
-    class InfoVis(TypedDict):
-        diametre: float
-        classe: Literal["4.6", "5.6", "8.8", "10.9", "12.9"]
-        materiau: Literal["acier", "inox"]
-        precharge_recommandee: float
+```yaml
+type: Length
+type: Force
+type: Stress
+type: Integer
+type: String
+```
 
-    def info_vis(designation: str) -> InfoVis:
-        """Retourne les infos d'une vis."""
-        diametre = int(designation[1:])
-        return {
-            "diametre": diametre,
-            "classe": "8.8",
-            "materiau": "acier",
-            "precharge_recommandee": diametre * 100
-        }
-    ```
+All canonical names from the catalog. Sous-typage applies on
+connection — `Force → Numeric` is fine, `Force → Length` is rejected.
 
-    ✅ Génère un schema objet avec :
-    - Propriétés typées
-    - Enums pour `classe` et `materiau`
-    - Tous les champs requis
-  </Accordion>
+### Files
 
-  <Accordion title="Validation de pattern string">
-    ```python
-    from typing import Annotated
-    from pydantic import Field
+```yaml
+type: File              # any extension
+type: File[pdf]         # exactly .pdf
+type: File[step,iges,brep]   # intersection allowed
+```
 
-    def decoder_reference(
-        reference: Annotated[str, Field(
-            pattern="^VIS-[A-Z]{2}-[0-9]{4}$",
-            examples=["VIS-AC-0812", "VIS-IN-1016"]
-        )]
-    ) -> dict:
-        """Décode une référence de vis."""
-        parts = reference.split("-")
-        return {
-            "type": parts[0],
-            "materiau": parts[1],
-            "dimensions": parts[2]
-        }
-    ```
+Extensions are case-insensitive and **never** include the leading dot
+(`File[.pdf]` is rejected — write `File[pdf]`). When validating an
+actual uploaded file, the platform checks the file's extension against
+the list.
 
-    ✅ Génère :
-    - Type : `string`
-    - Pattern regex : validation automatique
-    - Exemples : pour la documentation
-  </Accordion>
-</AccordionGroup>
+### Lists
 
-## Checklist
+```yaml
+type: list[Force]       # homogeneous list
+type: list[Vector3]
+type: list[Torsor]
+```
 
-<Steps>
-  <Step title="Type hints sur tous les paramètres">
-    `def func(x: float, y: str) -> dict:`
-  </Step>
-  <Step title="Pydantic Field pour les contraintes">
-    `Annotated[float, Field(ge=0, le=100)]`
-  </Step>
-  <Step title="TypedDict pour retours structurés">
-    `class Result(TypedDict): ...`
-  </Step>
-  <Step title="Docstrings NumPy pour descriptions">
-    Format NumPy avec sections Parameters/Returns
-  </Step>
-</Steps>
+Sous-typage applies **element-wise**: `list[Force] → list[Numeric]`
+✅, `list[Force] → list[Length]` ❌.
 
-## Prochaines étapes
+### Dicts
 
-<CardGroup cols={2}>
-  <Card
-    title="Exemples complets"
-    icon="code"
-    href="/manifest/examples"
-  >
-    Voir des cas d'usage réels avec auto-introspection
-  </Card>
-  <Card
-    title="Syntaxe du manifest"
-    icon="file-code"
-    href="/manifest/syntax"
-  >
-    Référence complète du fichier mecapy.yml
-  </Card>
-</CardGroup>
+```yaml
+type: dict[str, Length]
+type: dict[str, Force]
+```
+
+Always string-keyed. The value type is the only one parsed — the
+key is fixed to `str`.
+
+### Literals
+
+```yaml
+type: literal[8.8, 10.9, 12.9]    # only these values are valid
+```
+
+Useful for enumerations like quality classes. Any value not in the
+list fails validation.
+
+### Inline structs
+
+Either string form or YAML mapping form, both equivalent:
+
+```yaml
+# string form
+type: "{F: Force3, M: Moment3}"
+
+# YAML form
+type:
+  F: Force3
+  M: Moment3
+```
+
+Inline structs match field-by-field on connection — adding or
+removing a field changes the type. For repeated structs, define them
+in the catalog (or use the canonical `Torsor` for `{F, M}`).
+
+## `required` semantics
+
+The semantics of `required` are mode-asymmetric:
+
+| Port kind | `required: true` | `required: false` |
+|---|---|---|
+| **Input** | Caller must supply the value; missing → 422 at submit time. | May be omitted; absent from the kwargs / `in/data.json`. |
+| **Output (File)** | Worker validates the file is present in `out/files/`; missing → run failure. | Worker accepts both presence and absence. |
+| **Output (non-File)** | The function must return the key in its output dict. | n/a — non-File outputs are always required and the parser rejects `required: false` on them. |
+
+The default is `true` everywhere. Only declare `required: false`
+when the absence of the value carries real meaning (an optional
+diagnostic file, a fall-through input).
+
+## `Object` is input-only
+
+The `Object` catalog type is a one-way door. It accepts arbitrary
+JSON shapes on the input side, but **outputs cannot use Object**
+(directly or nested) — the parser rejects them at deploy time.
+
+The reason is workflow typing: a function returning `Object` is
+opaque to downstream nodes. If you genuinely have arbitrary
+output, refactor: return a typed struct, a `dict[str, T]` for some
+known `T`, or split the result into multiple typed outputs.
+
+## File ports — extension semantics
+
+For File **inputs**, the file is staged at
+`/workspace/in/files/<port_name>.<ext>` where `<ext>` comes from the
+caller's uploaded file. Mode A's runner passes a `pathlib.Path` keyed
+by the port name; modes B/C read it themselves.
+
+For File **outputs**, the worker expects exactly one file under
+`/workspace/out/files/` whose **stem** matches the port name —
+`out/files/report.pdf` for an output called `report`. The extension
+is preserved verbatim in the response.
+
+The extension constraint declared in the manifest (`File[pdf]`) is
+checked against:
+
+- the actual extension of input files at submit time,
+- the actual extension written under `out/files/` post-execution.
+
+## Mode A introspection
+
+Mode A is the only mode where you can **omit** `inputs:` / `outputs:`.
+The deploy parser imports your handler, reads its signature, and
+infers ports from type hints:
+
+```python bolts.py
+def size(diameter: float, load: float) -> dict:
+    return {"stress": load / area(diameter)}
+```
+
+Without an `inputs:` block in `mecapy.yml`, the parser infers
+`diameter: Float` and `load: Float`. The output uses a
+permissive `result: object` because `dict` (untyped) can't be
+narrowed.
+
+For workflow-eligible functions, **prefer explicit declaration** —
+introspection falls back to permissive types when the signature is
+ambiguous, and the workflow editor needs precise types to validate
+connections. The pedagogical example below shows the recommended
+shape:
+
+```yaml
+functions:
+  stress_bolt:
+    handler: handler:stress_bolt
+    inputs:
+      torsor:    { type: Torsor,  description: "Force/moment torsor at the bolt section." }
+      diameter:  { type: Length,  description: "Bolt nominal diameter (m)." }
+      pitch:     { type: Length,  description: "Thread pitch (m)." }
+    outputs:
+      sigma_eq:  { type: Stress,  description: "Von Mises equivalent stress (Pa)." }
+```
+
+In modes B and C `inputs:` / `outputs:` are mandatory because there
+is no Python signature to read.
+
+## Persistence and exposure
+
+Once parsed, the typed I/O is stored on `FunctionVersion.io_spec` and
+exposed via `GET /function-versions/{id}` as a `FunctionIoSpec`
+object. The frontend's typed AutoForm and the workflow connection
+checker both consume this spec — declaring it correctly is what
+unlocks rich UX downstream.

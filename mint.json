@@ -79,8 +79,12 @@
     {
       "group": "Package Development",
       "pages": [
-        "packages/MANIFEST_FORMAT",
+        "manifest/overview",
+        "manifest/syntax",
         "manifest/runtime-modes",
+        "manifest/handlers",
+        "manifest/schemas",
+        "manifest/examples",
         "packages/STANDARD_TYPES_GUIDE",
         "packages/PACKAGE_MULTI_FUNCTIONS",
         "packages/VERSIONING_STRATEGY",

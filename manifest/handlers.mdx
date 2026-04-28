@@ -1,436 +1,177 @@
 ---
-title: 'Handlers'
-description: 'Les différents types de handlers supportés'
+title: "Handlers and entrypoints"
+description: "How to point at the code that runs — handler in mode A, entrypoint in modes B/C."
 ---
 
-## Qu'est-ce qu'un handler ?
+Each function under `functions:` declares **one** of two fields:
 
-Le **handler** est le chemin vers votre fonction ou méthode Python. Il indique à MecaPy quelle fonction appeler.
+- `handler:` — string, mode A only. A Python import path that resolves
+  to a callable. MecaPy's runner imports the module and calls it.
+- `entrypoint:` — list of strings, modes B/C only. The argv that the
+  worker runs inside your container after staging `/workspace/in/`.
+
+Declaring both, or neither, or `entrypoint: []` is rejected at parse
+time.
+
+## Mode A — `handler:`
+
+The handler is a single string of the form `module:function`. The
+module is imported relative to your repo root; the function is
+fetched by attribute lookup on that module. **Only module-level
+functions are supported** — `module:Class.method`, callable classes,
+or partial application aren't accepted by the parser.
+
+### Plain function
 
 ```yaml
-handler: module.Class:method
-         └─────┬────┘ └──┬──┘
-          Module      Callable
-```
-
-## Types de handlers
-
-<CardGroup cols={2}>
-  <Card title="Fonction simple" icon="function">
-    La plus simple : une fonction Python
-  </Card>
-  <Card title="Méthode d'instance" icon="cube">
-    Méthode d'une classe (nécessite `init`)
-  </Card>
-  <Card title="Classmethod" icon="code-branch">
-    Méthode de classe avec `@classmethod`
-  </Card>
-  <Card title="Classe callable" icon="box">
-    Classe avec méthode `__call__`
-  </Card>
-</CardGroup>
-
-## 1. Fonction simple
-
-### Format
-```yaml
-handler: module:function
-```
-
-### Exemple
-
-<CodeGroup>
-
-```yaml mecapy.yml
 functions:
-  addition:
-    handler: calculs:add
+  size:
+    handler: bolts:size
 ```
 
-```python calculs.py
-def add(x: float, y: float) -> float:
-    """Additionne deux nombres."""
-    return x + y
+```python bolts.py
+def size(diameter: float, load: float) -> dict:
+    return {"stress": load / area(diameter)}
 ```
 
-</CodeGroup>
+The runner calls `size(**inputs)` where `inputs` is the merge of
+`in/data.json` and the File inputs (each File arrives as a
+`pathlib.Path`).
 
-### Comportement
+### Submodule
 
-```mermaid
-graph LR
-    A[Appel API] --> B[MecaPy]
-    B --> C[Import calculs]
-    C --> D[Appel add x y]
-    D --> E[Résultat]
-```
-
-<Note>
-  **Pas besoin de `init`** pour les fonctions simples.
-</Note>
-
-## 2. Méthode d'instance
-
-### Format
 ```yaml
-handler: module.Class:method
-init: [param1, param2]  # Requis !
+handler: pkg.subpkg.module:my_function
 ```
 
-### Exemple
+The dotted prefix is the import path, the `:` splits it from the
+attribute name. The runner adds `/workspace/` to `sys.path`, so
+anything you ship is importable from there.
 
-<CodeGroup>
+### Wrapping stateful behaviour
 
-```yaml mecapy.yml
-functions:
-  calcul-contrainte:
-    handler: vis.Vis:calculer_contrainte
-    init: [diametre, materiau]
-```
+If the underlying logic lives in a class, expose a module-level
+function that instantiates and dispatches:
 
-```python vis.py
+```python bolts.py
 class Vis:
-    def __init__(self, diametre: float, materiau: str):
-        """Initialise une vis."""
-        self.diametre = diametre
-        self.materiau = materiau
+    def __init__(self, designation: str): ...
+    def compute_stress(self, force: float) -> float: ...
 
-    def calculer_contrainte(self, force: float) -> dict:
-        """Calcule la contrainte de traction."""
-        aire = 3.14 * (self.diametre / 2) ** 2
-        return {
-            "contrainte": force / aire,
-            "unite": "MPa"
-        }
+# This is what the manifest references:
+def stress_for(designation: str, force: float) -> float:
+    return Vis(designation).compute_stress(force)
 ```
 
-</CodeGroup>
-
-### Comportement
-
-```mermaid
-graph LR
-    A[Appel API] --> B[MecaPy]
-    B --> C[Import vis.Vis]
-    C --> D[Vis diametre materiau]
-    D --> E[calculer_contrainte force]
-    E --> F[Résultat]
-```
-
-L'utilisateur appelle avec :
-```json
-{
-  "diametre": 12,
-  "materiau": "acier",
-  "force": 5000
-}
-```
-
-MecaPy exécute :
-```python
-vis = Vis(diametre=12, materiau="acier")
-result = vis.calculer_contrainte(force=5000)
-```
-
-<Warning>
-  Le paramètre `init` est **obligatoire** pour les méthodes d'instance !
-</Warning>
-
-### Format de init
-
-<Tabs>
-  <Tab title="Liste simple">
-    ```yaml
-    init: [diametre, materiau]
-    ```
-    Les valeurs viennent directement des inputs.
-  </Tab>
-  <Tab title="Mapping">
-    ```yaml
-    init:
-      diametre: "{inputs.diametre}"
-      materiau: "{inputs.materiau}"
-      longueur: 100  # Valeur fixe
-    ```
-  </Tab>
-  <Tab title="Transformation">
-    ```yaml
-    init:
-      diametre: "{inputs.diametre_mm}"
-      materiau: "get_materiau({inputs.code})"
-    ```
-  </Tab>
-</Tabs>
-
-## 3. Classmethod
-
-### Format
 ```yaml
-handler: module.Class:classmethod
-# Pas besoin de init !
+handler: bolts:stress_for
 ```
 
-### Exemple
+This keeps the function-vs-method distinction out of the platform —
+the manifest only ever sees module-level functions, and the class
+remains an internal implementation detail.
 
-<CodeGroup>
+### Signature → ports
 
-```yaml mecapy.yml
+In mode A, the handler's **type-annotated parameters** become input
+ports and the **return type** becomes output ports — without you
+writing an `inputs:` / `outputs:` section. The introspector reads:
+
+- Plain parameters → typed inputs (one port per parameter, name = parameter name).
+- `pathlib.Path` parameters → File inputs.
+- Single non-dict return type → one output called `result`.
+- `dict[str, T]` return → multiple typed outputs (one per dict key,
+  inferred from a `TypedDict` if you provide one).
+- `TypedDict` return → multiple typed outputs (one per field, type from the field).
+
+If the introspection fails (no annotations, ambiguous return type,
+etc.) the schemas fall back to a permissive `{"type": "object"}` and a
+warning is logged. **Always** prefer to add type hints — they drive
+the workflow editor's typing.
+
+You can override or supplement the auto-inferred ports by declaring
+`inputs:` / `outputs:` explicitly — see
+[typed I/O](/manifest/schemas).
+
+## Modes B/C — `entrypoint:`
+
+In modes B/C the worker doesn't import any user Python — it just
+launches the entrypoint inside your container with `/workspace/`
+already staged.
+
+```yaml
 functions:
-  creation-vis:
-    handler: vis.Vis:depuis_designation
+  static_support:
+    entrypoint: ["python3", "/workspace/_runner/wrapper.py"]
 ```
 
-```python vis.py
-class Vis:
-    def __init__(self, diametre: float, materiau: str):
-        self.diametre = diametre
-        self.materiau = materiau
+The list is the argv. Element 0 is the program; the rest are CLI args.
+The list **must be non-empty**; the worker errors out at validation
+otherwise. The image's own `ENTRYPOINT` and `CMD` are ignored — the
+worker invokes the argv directly via `docker exec`.
 
-    @classmethod
-    def depuis_designation(cls, designation: str) -> "Vis":
-        """
-        Crée une vis depuis sa désignation.
+### What your entrypoint must do
 
-        Parameters
-        ----------
-        designation : str
-            Désignation (M8, M12, M16, etc.)
+The entrypoint is responsible for the full
+[runtime contract](/runtime/contract):
 
-        Returns
-        -------
-        Vis
-            Instance de vis créée
-        """
-        diametre = int(designation[1:])
-        return cls(diametre, "acier")
+1. Read `/workspace/in/data.json` and `/workspace/in/files/*`.
+2. Run your computation.
+3. Write `/workspace/out/data.json` (a JSON object).
+4. Write any declared File outputs to `/workspace/out/files/<name>.<ext>`.
+5. Optionally drop free-form artifacts in `/workspace/out/artifacts/`.
+6. Optionally append progress lines to `/workspace/out/progress.jsonl`.
+7. On failure, write `/workspace/out/_error.json` and exit non-zero.
 
-    def calculer_contrainte(self, force: float) -> dict:
-        """Calcule la contrainte."""
-        aire = 3.14 * (self.diametre / 2) ** 2
-        return {"contrainte": force / aire}
-```
+### Multiple functions, one image
 
-</CodeGroup>
+Several functions in the same package share one image (built or
+pulled once). They distinguish themselves by their entrypoint argv:
 
-### Comportement
-
-```mermaid
-graph LR
-    A[Appel API] --> B[MecaPy]
-    B --> C[Import vis.Vis]
-    C --> D[Vis.depuis_designation designation]
-    D --> E[Résultat]
-```
-
-L'utilisateur appelle avec :
-```json
-{
-  "designation": "M12"
-}
-```
-
-MecaPy exécute :
-```python
-result = Vis.depuis_designation(designation="M12")
-```
-
-<Tip>
-  Les `@classmethod` sont parfaits pour les **factory methods** (création d'instances).
-</Tip>
-
-## 4. Classe callable
-
-### Format
 ```yaml
-handler: module.Class
-# La classe doit avoir __call__
-```
+runtime:
+  kind: image
+  image: ghcr.io/me/solver:1.4
 
-### Exemple
-
-<CodeGroup>
-
-```yaml mecapy.yml
 functions:
-  calculateur:
-    handler: calculator.Calculator
+  thermal:
+    entrypoint: ["/opt/run.sh", "--mode=thermal"]
+  mechanical:
+    entrypoint: ["/opt/run.sh", "--mode=mechanical"]
+  fatigue:
+    entrypoint: ["/opt/run.sh", "--mode=fatigue"]
 ```
 
-```python calculator.py
-class Calculator:
-    """Calculateur avec état."""
+The image is pulled (mode C) or built (mode B) **once** and cached;
+each function reuses it with different argv at exec time.
 
-    def __init__(self):
-        self.history = []
+### Per-function resources still apply
 
-    def __call__(self, operation: str, x: float, y: float) -> float:
-        """
-        Exécute une opération.
-
-        Parameters
-        ----------
-        operation : str
-            Opération (add, sub, mul, div)
-        x : float
-            Premier nombre
-        y : float
-            Second nombre
-
-        Returns
-        -------
-        float
-            Résultat de l'opération
-        """
-        if operation == "add":
-            result = x + y
-        elif operation == "sub":
-            result = x - y
-        elif operation == "mul":
-            result = x * y
-        elif operation == "div":
-            result = x / y
-        else:
-            raise ValueError(f"Opération inconnue: {operation}")
-
-        self.history.append((operation, x, y, result))
-        return result
-```
-
-</CodeGroup>
-
-<Note>
-  La classe doit implémenter `__call__` pour être callable.
-</Note>
-
-## Modules imbriqués
-
-Tous les formats supportent les modules imbriqués.
-
-### Exemples
+`resources:` overrides on each function work in modes B/C just like
+mode A — it changes the cgroup limits and timeout for that
+function's runs:
 
 ```yaml
-# Module simple
-handler: calculs:add
-
-# Module imbriqué - fonction
-handler: package.subpackage.module:function
-
-# Module imbriqué - méthode
-handler: package.subpackage.vis.Vis:calculer_contrainte
-init: [diametre, materiau]
-
-# Module imbriqué - classmethod
-handler: package.subpackage.vis.Vis:depuis_designation
+functions:
+  thermal:
+    entrypoint: ["/opt/run.sh", "--mode=thermal"]
+    resources:
+      tier: small
+  mechanical:
+    entrypoint: ["/opt/run.sh", "--mode=mechanical"]
+    resources:
+      tier: large       # mechanical needs more memory
 ```
 
-## Tableau récapitulatif
+## Choosing between modes
 
-| Type | Format | `init` requis ? | Exemple |
-|------|--------|----------------|---------|
-| **Fonction** | `module:function` | ❌ Non | `calculs:add` |
-| **Méthode** | `module.Class:method` | ✅ **Oui** | `vis.Vis:calculer_contrainte` |
-| **Classmethod** | `module.Class:classmethod` | ❌ Non | `vis.Vis:depuis_designation` |
-| **Callable** | `module.Class` | ❌ Non | `calculator.Calculator` |
+| Question | Answer |
+|---|---|
+| Pure Python with PyPI deps? | **Mode A**. Skip the Dockerfile boilerplate. |
+| Native solver / system package / GPU? | **Mode B**. Ship a Dockerfile. |
+| Image already published, can't change it? | **Mode C**. Reference by digest or tag. |
+| Multiple functions sharing native deps? | One package, multiple functions, mode B or C. |
+| Multiple unrelated functions? | One package per function — versioning is independent. |
 
-## Erreurs courantes
-
-<AccordionGroup>
-  <Accordion title="Méthode sans init" icon="triangle-exclamation">
-    **Erreur** :
-    ```yaml
-    handler: vis.Vis:calculer_contrainte
-    # Manque init !
-    ```
-
-    **Solution** :
-    ```yaml
-    handler: vis.Vis:calculer_contrainte
-    init: [diametre, materiau]  # ✅
-    ```
-  </Accordion>
-
-  <Accordion title="Mauvais séparateur" icon="triangle-exclamation">
-    **Erreur** :
-    ```yaml
-    handler: vis.Vis.calculer_contrainte  # ❌ Point au lieu de :
-    ```
-
-    **Solution** :
-    ```yaml
-    handler: vis.Vis:calculer_contrainte  # ✅ Deux-points
-    ```
-  </Accordion>
-
-  <Accordion title="Classmethod avec init" icon="triangle-exclamation">
-    **Erreur** :
-    ```yaml
-    handler: vis.Vis:depuis_designation
-    init: [designation]  # ❌ Pas nécessaire
-    ```
-
-    **Solution** :
-    ```yaml
-    handler: vis.Vis:depuis_designation  # ✅ Sans init
-    ```
-  </Accordion>
-
-  <Accordion title="Classe non callable" icon="triangle-exclamation">
-    **Erreur** :
-    ```python
-    class MyClass:
-        def process(self, x):  # ❌ Pas de __call__
-            return x * 2
-    ```
-    ```yaml
-    handler: module.MyClass  # ❌ Erreur au runtime
-    ```
-
-    **Solution** :
-    ```python
-    class MyClass:
-        def __call__(self, x):  # ✅ Méthode __call__
-            return x * 2
-    ```
-    Ou utiliser la méthode :
-    ```yaml
-    handler: module.MyClass:process  # ✅
-    init: []  # Si pas de __init__
-    ```
-  </Accordion>
-</AccordionGroup>
-
-## Bonnes pratiques
-
-<Steps>
-  <Step title="Privilégier les fonctions simples">
-    Pour les cas simples, une fonction suffit. Pas besoin de classe.
-  </Step>
-  <Step title="Utiliser les classmethods pour les factories">
-    Créer des instances avec différentes configurations.
-  </Step>
-  <Step title="Méthodes pour l'état partagé">
-    Quand plusieurs paramètres sont utilisés par plusieurs méthodes.
-  </Step>
-  <Step title="Type hints partout">
-    Sur toutes les fonctions/méthodes pour l'auto-introspection.
-  </Step>
-</Steps>
-
-## Prochaines étapes
-
-<CardGroup cols={2}>
-  <Card
-    title="Auto-introspection"
-    icon="wand-magic-sparkles"
-    href="/manifest/schemas"
-  >
-    Comment les schemas sont générés automatiquement
-  </Card>
-  <Card
-    title="Exemples"
-    icon="code"
-    href="/manifest/examples"
-  >
-    Cas d'usage complets avec handlers
-  </Card>
-</CardGroup>
+Workflow-side typing works identically across all three modes — the
+worker just routes the inputs through a different staging flow.

@@ -1,407 +1,217 @@
 ---
-title: 'Syntaxe'
-description: 'Référence complète du fichier mecapy.yml'
+title: "Syntax reference"
+description: "Every field, every default, every constraint of mecapy.yml v1."
 ---
 
-## Structure du fichier
+This page is the canonical reference for `mecapy.yml` v1. Each section
+maps one-to-one to a Pydantic model in
+`mecapy_api.services.manifest_v1_models`, which is the source of truth.
 
-```yaml mecapy.yml
-name: nom-package
-description: Description
-author: Nom Auteur
-license: MIT
-visibility: private   # "public" | "private" (défaut: private)
-tags:
-  - tag1
-  - tag2
-
-functions:
-  nom-fonction:
-    handler: module:function
-    description: Description fonction
-    init: [param1, param2]
-
-runtime:
-  python: "3.12"
-  timeout: 300
-  memory: 2048
-
-tests:
-  framework: pytest
-  min_coverage: 80
-```
-
-## Champs Package
-
-### name (requis)
-
-Nom unique de votre package en **kebab-case**.
+## `version`
 
 ```yaml
-name: calculs-mecaniques  # ✅ Bon
-name: calculs_mecaniques  # ❌ Éviter
-name: CalculsMecaniques   # ❌ Éviter
+version: "1"
 ```
 
-<Warning>
-  Le nom doit être unique sur la plateforme MecaPy.
-</Warning>
+Frozen at `"1"`. Any other value is rejected. A future v2 format will
+keep the same key and bump the literal — your existing manifests
+stay valid as long as MecaPy keeps the v1 parser around.
 
-### description (optionnel)
-
-Description courte de votre package.
+## `package`
 
 ```yaml
-description: Suite de calculs pour assemblages boulonnés selon Eurocode 3
+package:
+  name: bolt-sizing                  # required
+  version: 0.1.0                     # required, semver
+  description: |                     # optional
+    One-line summary; multi-line allowed.
+  author: Jane Doe                   # optional
+  license: MIT                       # optional
+  visibility: private                # optional, default "private"
+  tags: [bolts, mechanics]           # optional
+  resources:                         # optional, see below
+    tier: nano
 ```
 
-### author (optionnel)
+| Field | Type | Default | Notes |
+|---|---|---|---|
+| `name` | string | — | Package identifier. Kebab-case recommended. |
+| `version` | string | — | Strict semver: `MAJOR.MINOR.PATCH` (optional pre-release tag). |
+| `description` | string | `null` | Free text. |
+| `author` | string | `null` | Free text. |
+| `license` | string | `null` | SPDX identifier (`MIT`, `Apache-2.0`, …). |
+| `visibility` | enum | `"private"` | `private` / `internal` / `public`. See [visibility](/security/visibility). |
+| `tags` | list[string] | `null` | For search/categorisation in the package list. |
+| `resources` | object | `null` | Default resources every function inherits — see below. |
 
-Nom de l'auteur ou de l'organisation.
+## `runtime`
 
-```yaml
-author: Votre Nom
-# ou
-author: Votre Organisation
-```
-
-### license (optionnel)
-
-Licence du package. Par défaut : `MIT`.
-
-```yaml
-license: MIT
-# ou
-license: Apache-2.0
-# ou
-license: GPL-3.0
-```
-
-### visibility (optionnel)
-
-Visibilité du package. Par défaut : `private`.
-
-```yaml
-visibility: public   # Visible par tous, sans authentification
-# ou
-visibility: private  # Visible uniquement par le propriétaire (défaut)
-```
-
-<Info>
-  La visibilité peut être modifiée après déploiement via l'API ou l'interface web, sans redéployer le package.
-</Info>
-
-### tags (optionnel)
-
-Liste de tags pour catégoriser votre package.
-
-```yaml
-tags:
-  - mécanique
-  - assemblage
-  - eurocode
-  - calcul-structure
-```
-
-## Champs Functions
-
-### handler (requis)
-
-Chemin vers la fonction ou méthode à exposer.
-
-<Tabs>
-  <Tab title="Fonction simple">
-    ```yaml
-    handler: module:function
-    ```
-    Exemple : `calculs:add`
-  </Tab>
-  <Tab title="Méthode d'instance">
-    ```yaml
-    handler: module.Class:method
-    ```
-    Exemple : `vis.Vis:calculer_contrainte`
-  </Tab>
-  <Tab title="Classmethod">
-    ```yaml
-    handler: module.Class:classmethod
-    ```
-    Exemple : `vis.Vis:depuis_designation`
-  </Tab>
-  <Tab title="Classe callable">
-    ```yaml
-    handler: module.Class
-    ```
-    Exemple : `calculator.Calculator`
-  </Tab>
-</Tabs>
-
-<Tip>
-  Consultez la page [Handlers](/manifest/handlers) pour plus de détails.
-</Tip>
-
-### description (optionnel)
-
-Description courte de la fonction.
-
-```yaml
-functions:
-  calcul-contrainte:
-    handler: vis.Vis:calculer_contrainte
-    description: Calcule la contrainte de traction selon RDM
-```
-
-### init (optionnel, méthodes uniquement)
-
-Paramètres du constructeur pour les **méthodes d'instance**.
-
-<Tabs>
-  <Tab title="Format liste (simple)">
-    ```yaml
-    init: [diametre, materiau]
-    ```
-    Équivalent à :
-    ```python
-    Vis(diametre=inputs["diametre"], materiau=inputs["materiau"])
-    ```
-  </Tab>
-  <Tab title="Format mapping (avancé)">
-    ```yaml
-    init:
-      diametre: "{inputs.diametre}"
-      materiau: "{inputs.materiau}"
-      longueur: 100  # Valeur fixe
-    ```
-  </Tab>
-  <Tab title="Avec transformation">
-    ```yaml
-    init:
-      diametre: "{inputs.diametre_mm}"
-      materiau: "get_materiau({inputs.code_materiau})"
-    ```
-  </Tab>
-</Tabs>
-
-<Note>
-  Le paramètre `init` est **uniquement pour les méthodes d'instance**. Pas nécessaire pour les fonctions simples ou classmethods.
-</Note>
-
-### inputs_schema (optionnel, rare)
-
-Override manuel du schema d'entrée. **Rarement nécessaire**, laissez l'auto-introspection faire le travail.
-
-```yaml
-functions:
-  fonction-custom:
-    handler: module:function
-    inputs_schema:
-      type: object
-      properties:
-        code:
-          type: string
-          pattern: "^[A-Z]{3}-[0-9]{4}$"
-      required: [code]
-```
-
-<Warning>
-  N'utilisez `inputs_schema` que si l'auto-introspection ne suffit pas. Dans 90% des cas, les type hints Python suffisent.
-</Warning>
-
-### outputs_schema (optionnel, rare)
-
-Override manuel du schema de sortie.
-
-```yaml
-functions:
-  fonction-custom:
-    handler: module:function
-    outputs_schema:
-      type: object
-      properties:
-        resultat: {type: number}
-        statut: {type: string}
-```
-
-## Configuration Runtime
-
-Configuration d'exécution par défaut pour toutes les fonctions.
+The block is a **discriminated union** on `kind`. Each kind has its
+own required fields:
 
 ```yaml
 runtime:
-  python: "3.12"      # Version Python (3.11, 3.12)
-  timeout: 300        # Timeout en secondes (défaut: 300)
-  memory: 2048        # Mémoire en MB (défaut: 2048)
+  kind: python              # mode A — managed
+  version: "3.12"           # required, "3.10" | "3.11" | "3.12"
+  requirements: false       # optional, install repo-root requirements.txt at build
 ```
 
-### Override par fonction
+```yaml
+runtime:
+  kind: dockerfile          # mode B — build custom
+  dockerfile: Dockerfile    # required, path relative to repo root
+  context: .                # optional, default "."
+```
 
-Vous pouvez override le runtime pour une fonction spécifique :
+```yaml
+runtime:
+  kind: image               # mode C — pre-built
+  image: ghcr.io/me/x:1.4   # required, full registry reference with tag
+```
+
+Per-kind details and trade-offs: [runtime modes](/manifest/runtime-modes).
+
+## `functions`
+
+A non-empty dict. Each entry has the same shape but two mutually
+exclusive top fields depending on the runtime mode:
 
 ```yaml
 functions:
-  calcul-rapide:
-    handler: module:quick
-    runtime:
-      timeout: 60
-      memory: 512
+  my_function:
+    # ── Mode A only ──
+    handler: pkg.module:function           # required in mode A
 
-  calcul-lourd:
-    handler: module:heavy
-    runtime:
-      timeout: 900
-      memory: 8192
+    # ── Modes B/C only ──
+    entrypoint: ["python", "/run.py", "x"] # required in modes B/C, list[str], non-empty
+
+    # ── Common ──
+    description: |
+      Free-text description.
+    inputs:
+      diameter: { type: Length, required: true, description: "..." }
+      load:     { type: Force }
+    outputs:
+      stress:   { type: Stress }
+    resources:
+      tier: nano
+      timeout: 120
+    testcases: tests/static_support.json   # optional path to JSON test cases
 ```
 
-## Configuration Tests
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `handler` | string | mode A only | `module:function`. Module-level functions only — see [handlers](/manifest/handlers). |
+| `entrypoint` | list[string] | modes B/C only | argv list, non-empty. The container runs `entrypoint[0] entrypoint[1] ...`. |
+| `description` | string | no | Free text. |
+| `inputs` | object | no | Typed input ports. See [typed I/O](/manifest/schemas). |
+| `outputs` | object | no | Typed output ports. |
+| `resources` | object | no | Per-function override of `package.resources`. |
+| `testcases` | string | no | Path (relative to repo root) of a JSON file with test cases — read at deploy when `quality.validation_testcases.on_deployment` is true. |
 
-Configuration de la validation des tests.
+`handler` and `entrypoint` are mutually exclusive at the model level
+(can't have both, must have one). The cross-check against
+`runtime.kind` happens after parsing — mode A requires `handler`,
+modes B/C require `entrypoint`.
+
+In mode A you can leave `inputs:` / `outputs:` out entirely — MecaPy
+introspects the handler's signature and infers them from type hints.
+You only declare them when you want to override or document. In modes
+B/C they are mandatory because there's no Python signature to read.
+
+## `resources`
+
+Two ways to declare resources, **mutually exclusive within the same block**:
+
+### Tier shortcut
 
 ```yaml
-tests:
-  framework: pytest           # Framework (pytest par défaut)
-  min_coverage: 80           # Couverture minimale en %
-  command: "pytest tests/"   # Commande personnalisée (optionnel)
+resources:
+  tier: nano                # one of: nano, micro, small, medium, large
+  timeout: 60               # optional, overrides the tier's timeout
 ```
 
-<Info>
-  MecaPy détecte automatiquement les tests dans le dossier `tests/`.
-</Info>
+| Tier | CPU | Memory (MiB) | Timeout (s) |
+|---|---|---|---|
+| `nano` | 1 | 512 | 60 |
+| `micro` | 1 | 1024 | 120 |
+| `small` (default) | 2 | 2048 | 300 |
+| `medium` | 2 | 4096 | 600 |
+| `large` | 4 | 8192 | 1800 |
 
-## Exemples complets
+`large` is the platform hard cap. Asking for more in `cpu`,
+`memory_mb`, or `timeout` (below) raises a validation error.
 
-<AccordionGroup>
-  <Accordion title="Package minimal">
-    ```yaml
-    name: simple-calc
-    description: Calculateur simple
+### Explicit values
 
-    functions:
-      add:
-        handler: calculator:add
-    ```
-  </Accordion>
+```yaml
+resources:
+  cpu: 2
+  memory_mb: 1500
+  timeout: 90
+```
 
-  <Accordion title="Package avec méthodes">
-    ```yaml
-    name: mecapy-vis
-    description: Calculs d'assemblages boulonnés
+`cpu` and `memory_mb` may both appear, neither, or just one — but
+neither can coexist with `tier:` in the same block.
 
-    functions:
-      contrainte-traction:
-        handler: vis.Vis:calculer_contrainte_traction
-        init: [diametre, materiau]
+### Inheritance
 
-      cisaillement:
-        handler: vis.Vis:calculer_cisaillement
-        init: [diametre, materiau]
+`package.resources` sets the default. Each function may override with
+its own `resources:` block. The merge follows three rules:
 
-      creation-vis:
-        handler: vis.Vis:depuis_designation
-    ```
-  </Accordion>
+1. If the **function** declares `tier:`, it fully selects CPU/memory
+   from that tier — package-level cpu/memory_mb are dropped.
+2. If the **function** declares `cpu:` and/or `memory_mb:`, those
+   become authoritative for the fields they cover; the *other*
+   explicit field, when missing, is inherited from the package
+   (unless package was tier-mode, in which case the function must
+   provide both).
+3. `timeout:` is independently overridable at any level.
 
-  <Accordion title="Package avec runtime custom">
-    ```yaml
-    name: advanced-package
+Missing both blocks falls back to the platform default (`tier: small`).
 
-    functions:
-      light-task:
-        handler: tasks:light
-        runtime:
-          timeout: 60
-          memory: 512
+## `quality`
 
-      heavy-task:
-        handler: tasks:heavy
-        runtime:
-          timeout: 900
-          memory: 8192
+A free-form dict. Today's only consumer is testcase gating:
 
-    runtime:
-      python: "3.12"
-      timeout: 300
-      memory: 2048
-    ```
-  </Accordion>
+```yaml
+quality:
+  validation_testcases:
+    on_deployment: true     # run testcases at deploy time
+    fail_on_error: false    # block deploy on test failure (default false)
+```
 
-  <Accordion title="Package avec overrides">
-    ```yaml
-    name: custom-validation
+When `on_deployment: true`, the deploy route loads each function's
+`testcases:` JSON file and runs the cases. Per-function status is
+surfaced in the deploy response. With `fail_on_error: true`, a failing
+case turns the deploy into a 4xx; otherwise the deploy completes and
+the failed cases are reported as warnings.
 
-    functions:
-      # Fonction normale (auto-introspection)
-      simple:
-        handler: module:simple
+The block is intentionally untyped at the model level so new sub-keys
+can land without bumping the manifest format. Anything outside
+`validation_testcases` is currently ignored.
 
-      # Fonction avec validation custom
-      complex:
-        handler: module:complex
-        inputs_schema:
-          type: object
-          properties:
-            code:
-              type: string
-              pattern: "^[A-Z]{3}-[0-9]{4}$"
-            data:
-              type: array
-              items:
-                type: object
-                properties:
-                  key: {type: string}
-                  value: {type: number}
-          required: [code, data]
-    ```
-  </Accordion>
-</AccordionGroup>
+## Validation order
 
-## Bonnes pratiques
+The parser runs in this order — knowing the order helps when reading
+error messages:
 
-<CardGroup cols={2}>
-  <Card title="Nommage kebab-case" icon="text">
-    Utilisez des tirets pour les noms de packages et fonctions
-  </Card>
-  <Card title="Type hints complets" icon="code">
-    Annotez toutes vos fonctions pour l'auto-introspection
-  </Card>
-  <Card title="Docstrings NumPy" icon="file-lines">
-    Documentez avec le format NumPy pour les descriptions
-  </Card>
-  <Card title="Tests" icon="vial">
-    Incluez des tests dans le dossier `tests/`
-  </Card>
-</CardGroup>
+1. **YAML load** — syntax errors here come from `pyyaml`.
+2. **Pydantic schema** — type-checks every field per the model.
+3. **Discriminated runtime resolution** — `runtime.kind` selects which
+   sub-model parses the rest of the runtime block.
+4. **`handler` XOR `entrypoint`** — function-level model validator.
+5. **Cross-check `runtime.kind` ↔ per-function field** — manifest-level
+   validator (`validate_manifest_modes`).
+6. **Resources caps** — every `resources:` block must respect
+   `large`-tier limits.
+7. **Typed I/O resolution** — every `type:` is looked up in the
+   [type catalog](/workflows/type-system); unknown types fail.
+8. **Mode A signature introspection** (deploy-time only) — the
+   handler is imported and its signature read for type-hint-based
+   schemas.
 
-## Validation
-
-### Checklist
-
-- [ ] `name` est unique et en kebab-case
-- [ ] Tous les `handler` sont valides
-- [ ] Les `init` correspondent aux constructeurs
-- [ ] Type hints présents sur toutes les fonctions
-- [ ] Docstrings NumPy sur toutes les fonctions
-- [ ] Tests présents dans `tests/`
-- [ ] `requirements.txt` ou `pyproject.toml` à jour
-
-<Tip>
-  MecaPy valide automatiquement votre manifest au déploiement et vous signale les erreurs.
-</Tip>
-
-## Prochaines étapes
-
-<CardGroup cols={2}>
-  <Card
-    title="Types de handlers"
-    icon="link"
-    href="/manifest/handlers"
-  >
-    Fonctions, méthodes, classmethods en détail
-  </Card>
-  <Card
-    title="Auto-introspection"
-    icon="wand-magic-sparkles"
-    href="/manifest/schemas"
-  >
-    Comment fonctionnent les schemas auto-générés
-  </Card>
-</CardGroup>
+Errors in steps 1–7 are returned synchronously as 4xx by the deploy
+route. Step 8 errors fall back to a permissive `{"type": "object"}`
+schema with a warning logged server-side rather than failing the
+deploy outright.
