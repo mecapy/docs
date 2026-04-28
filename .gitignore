@@ -3,9 +3,5 @@
 node_modules/
 package-lock.json
 
-# OpenAPI static files (we use dynamic URLs now)
-openapi.json
-openapi.yaml
-
 # Backup files
 *.backup

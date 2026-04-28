@@ -1,0 +1,4829 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MecaPy API",
+    "description": "API for MecaPy with Keycloak authentication and database persistence",
+    "version": "0.1.2.post117.dev0+e3a8140"
+  },
+  "paths": {
+    "/function-versions/{function_version_id}": {
+      "get": {
+        "tags": [
+          "function-versions"
+        ],
+        "summary": "Get Function Version",
+        "description": "Return the detail of a FunctionVersion (FRO-fn-04).\n\nVisibility follows the parent package's rules (FRO-pkg-08/10):\n- public packages: any user (authenticated or not).\n- internal: members of the package's organization.\n- private: owner only.",
+        "operationId": "get_function_version_function_versions__function_version_id__get",
+        "parameters": [
+          {
+            "name": "function_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Function Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionVersionDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "List Jobs",
+        "description": "List recent jobs submitted by the authenticated user.\n\nJobs whose package is no longer visible to the caller (FRO-pkg-10) are filtered out.",
+        "operationId": "list_jobs_jobs_get",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Job Status",
+        "description": "Get status of a running or completed job.\n\nEnforces FRO-pkg-10: 403 if the user no longer has access to the job's package.",
+        "operationId": "get_job_status_jobs__job_id__get",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{job_id}/result": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Job Result",
+        "description": "Get the result of a completed job (with FRO-pkg-10 enforcement).",
+        "operationId": "get_job_result_jobs__job_id__result_get",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResultResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{job_id}/logs": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Job Logs",
+        "description": "Stream execution logs for a job (:spec:`FRO-jobs-08` v2).\n\nReturns only chunks emitted since index ``since`` so the frontend can\npoll incrementally while the job runs. ``done=True`` once the job has\nreached a terminal status — callers should stop polling then.\n\nEnforces FRO-pkg-10: 403 if the caller lost access to the job's package.",
+        "operationId": "get_job_logs_jobs__job_id__logs_get",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Skip chunks already consumed",
+              "default": 0,
+              "title": "Since"
+            },
+            "description": "Skip chunks already consumed"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobLogsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Get Current User Info",
+        "description": "Get information about the currently authenticated user.\n\nThis endpoint requires authentication.",
+        "operationId": "get_current_user_info_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ]
+      }
+    },
+    "/auth/protected": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Protected Route",
+        "description": "Example protected route that requires authentication.",
+        "operationId": "protected_route_auth_protected_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ]
+      }
+    },
+    "/auth/admin": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Admin Route",
+        "description": "Example admin route that requires the admin role.",
+        "operationId": "admin_route_auth_admin_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ]
+      }
+    },
+    "/packages": {
+      "get": {
+        "tags": [
+          "packages"
+        ],
+        "summary": "List Packages",
+        "description": "List packages with permission-aware filtering (FRO-pkg-08/09/13).\n\nVisible set:\n- ``public`` packages → everyone, even anonymous callers (FRO-pkg-09).\n- ``internal`` packages → members of the package's organization.\n- ``private`` packages → the owner only.\n\nArchive filter (FRO-pkg-05): ``include_archived`` lets the caller see\ntheir own archived packages.\n\nYank filter (FRO-pkg-13): yanked packages are hidden from\ndiscoverability (listing) by default for all callers. The owner can\npass ``include_yanked=true`` to see their own yanked packages.\nWorkflows tiers that already cite a yanked package continue to\nresolve the FunctionVersion via the direct route — yank only affects\nthe listing, not the storage.",
+        "operationId": "list_packages_packages_get",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page",
+              "default": 20,
+              "title": "Per Page"
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "include_archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include own archived packages (authenticated only)",
+              "default": false,
+              "title": "Include Archived"
+            },
+            "description": "Include own archived packages (authenticated only)"
+          },
+          {
+            "name": "include_yanked",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include own yanked packages (FRO-pkg-13). Yanked packages are hidden from public/internal listings by default ; this flag lets the owner see their own yanked entries.",
+              "default": false,
+              "title": "Include Yanked"
+            },
+            "description": "Include own yanked packages (FRO-pkg-13). Yanked packages are hidden from public/internal listings by default ; this flag lets the owner see their own yanked entries."
+          },
+          {
+            "name": "visibility",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PackageVisibility"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by visibility",
+              "title": "Visibility"
+            },
+            "description": "Filter by visibility"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/{package_id}": {
+      "get": {
+        "tags": [
+          "packages"
+        ],
+        "summary": "Get Package",
+        "description": "Get details of a specific package.\n\nPublic packages are accessible without authentication.\nPrivate packages require authentication and ownership.\n\nParameters\n----------\npackage_id : str\n    Unique identifier of the package\n\nReturns\n-------\nPackageResponse\n    Complete package details with functions\n\nRaises\n------\nHTTPException\n    - 404: Package not found\n    - 403: Access denied (private package, not owner)",
+        "operationId": "get_package_packages__package_id__get",
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/{package_id}/visibility": {
+      "patch": {
+        "tags": [
+          "packages"
+        ],
+        "summary": "Update Package Visibility",
+        "description": "Update the visibility of a package.\n\nOnly the package owner can change visibility. The manifest `visibility`\nfield sets the initial value at deploy time; this endpoint allows\npost-deployment overrides without requiring a redeploy.\n\nParameters\n----------\npackage_id : str\n    Unique identifier of the package\nbody : PackageVisibilityUpdate\n    New visibility setting\n\nReturns\n-------\nPackageResponse\n    Updated package details\n\nRaises\n------\nHTTPException\n    - 404: Package not found\n    - 403: Not the package owner",
+        "operationId": "update_package_visibility_packages__package_id__visibility_patch",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PackageVisibilityUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/{package_id}/archive": {
+      "post": {
+        "tags": [
+          "packages"
+        ],
+        "summary": "Archive Package",
+        "description": "Archive a package (reversible). Archived packages are hidden from non-owners.\n\nRaises\n------\nHTTPException\n    - 404: Package not found\n    - 403: Not the package owner\n    - 409: Package is already archived",
+        "operationId": "archive_package_packages__package_id__archive_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/{package_id}/unarchive": {
+      "post": {
+        "tags": [
+          "packages"
+        ],
+        "summary": "Unarchive Package",
+        "description": "Unarchive a previously archived package.\n\nRaises\n------\nHTTPException\n    - 404: Package not found\n    - 403: Not the package owner\n    - 409: Package is not archived",
+        "operationId": "unarchive_package_packages__package_id__unarchive_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/{package_id}/yank": {
+      "post": {
+        "tags": [
+          "packages"
+        ],
+        "summary": "Yank Package",
+        "description": "Yank a package (FRO-pkg-13).\n\nDistinct de l'archive (FRO-pkg-05) : retire le package de la\ndiscoverability publique (listings, marketplace) tout en préservant\nles références descendantes — workflows tiers continuent à pouvoir\nl'exécuter. Pattern registry (npm/Cargo yank).\n\nIdempotent : yank d'un package déjà yanké est un no-op (preserve\nle yanked_at original).\n\nPas applicable aux packages ``private`` (pas de listing public à\nretirer) → 400.\n\nRaises\n------\nHTTPException\n    - 404: Package not found\n    - 403: Not the package owner\n    - 400: visibility=private (yank not applicable)",
+        "operationId": "yank_package_packages__package_id__yank_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/{package_id}/unyank": {
+      "post": {
+        "tags": [
+          "packages"
+        ],
+        "summary": "Unyank Package",
+        "description": "Un-yank a previously yanked package (FRO-pkg-13).\n\nIdempotent : unyank d'un package non-yanké est un no-op.\n\nRaises\n------\nHTTPException\n    - 404: Package not found\n    - 403: Not the package owner",
+        "operationId": "unyank_package_packages__package_id__unyank_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/{package_id}/functions/{function_name}/uploads": {
+      "post": {
+        "tags": [
+          "packages"
+        ],
+        "summary": "Upload Function File",
+        "description": "Upload a File input ahead of execution (FRO-runtime-02).\n\nThe file is stored under\n``s3://{CLOUD_BUCKET_UPLOADS}/uploads/{user_id}/{upload_id}/{var}.{ext}``\nand indexed in Redis (24h TTL). The returned ``upload_id`` can be\nreferenced by ``POST /packages/{id}/functions/{name}/execute`` via\nits ``file_inputs`` map.\n\nValidation:\n- Var name must reference a typed File input port on the function.\n- File extension must be accepted by the port's ``File[ext1,ext2,…]``\n  constraint (any extension is allowed when the port is plain ``File``).\n\nReturns\n-------\nFileUploadResponse\n    Metadata describing the stored upload.\n\nRaises\n------\nHTTPException\n    - 404: package or function not found.\n    - 403: caller cannot execute this package.\n    - 422: var_name is not a File-typed input, or extension rejected.\n    - 500: S3 storage failure.",
+        "operationId": "upload_function_file_packages__package_id__functions__function_name__uploads_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          },
+          {
+            "name": "function_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Function Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_function_file_packages__package_id__functions__function_name__uploads_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/{package_id}/functions/{function_name}/execute": {
+      "post": {
+        "tags": [
+          "packages"
+        ],
+        "summary": "Execute Package Function",
+        "description": "Execute a function from a deployed package asynchronously.\n\nSubmits an execution job to the worker queue via Redis.\nThe function runs in an isolated Docker container; results are\navailable via GET /jobs/{job_id}/result once completed.\n\nAccess control:\n- Public package → any authenticated user can execute\n- Private package → owner only\n\nParameters\n----------\npackage_id : str\n    Unique identifier of the package\nfunction_name : str\n    Name of the function to execute (as declared in mecapy.yml)\nrequest : FunctionExecuteRequest\n    Execution payload\ncurrent_user : UserInfo\n    Authenticated user\n\nReturns\n-------\nJobSubmitResponse\n    Job ID for tracking execution via GET /jobs/{job_id}/result\n\nRaises\n------\nHTTPException\n    - 404: Package or function not found\n    - 403: Private package, not the owner\n    - 500: Worker submission or S3 extraction failed",
+        "operationId": "execute_package_function_packages__package_id__functions__function_name__execute_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          },
+          {
+            "name": "function_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Function Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FunctionExecuteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSubmitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/from-git": {
+      "post": {
+        "tags": [
+          "packages"
+        ],
+        "summary": "Deploy Package From Git",
+        "description": "Deploy a multi-function package from a Git repository.\n\nThis endpoint clones a Git repository containing a mecapy.yml manifest,\nvalidates the package version, extracts all functions, and deploys them as\nserverless functions. Supports both public and private repositories.\n\nThe manifest format is simple and minimal with automatic schema introspection.\nSchemas are auto-generated from Python type hints and docstrings, with optional\nexplicit overrides when needed.\n\nWorkflow:\n1. Clone Git repository\n2. Find and parse mecapy.yml manifest\n2.5. Validate manifest version against Git tags\n3. Validate package version (409 if exists)\n4. Upload package source to S3\n5. Create Package and PackageVersion records\n6. Extract and deploy each function (with auto-introspection)\n7. Load and validate test cases (if enabled)\n8. Update package status\n9. Cleanup temporary files\n\nSecurity features:\n- Validates Git URL against allowed providers\n- Enforces SemVer versioning (MAJOR.MINOR.PATCH)\n- Prevents version conflicts (immutable versions)\n- Validates import paths and function code\n- Scans for dangerous imports\n\nParameters\n----------\nrequest : PackageFromGitRequest\n    Package deployment configuration including Git URL, ref, and deployment strategy\ncurrent_user : UserInfo\n    Authenticated user (injected by dependency)\nsession : AsyncSession\n    Database session\n\nReturns\n-------\nPackageDeployResponse\n    Deployment results with package info and deployment statistics\n\nRaises\n------\nHTTPException\n    - 400: Invalid Git URL, manifest not found, or malformed manifest\n    - 404: Package manifest (mecapy.yml) not found\n    - 409: Package version already exists (version conflict)\n    - 422: Code validation failed or invalid import paths\n    - 500: Deployment or Git cloning failed\n\nExample\n-------\n    ```python\n    # Deploy entire package from GitHub\n    response = await client.post(\n        \"/packages/from-git\",\n        json={\n            \"git_url\": \"https://github.com/mecapy/boulonnerie.git\",\n            \"git_ref\": \"main\",\n            \"deploy_strategy\": \"all\",\n        },\n    )\n\n    # Deploy specific functions from package\n    response = await client.post(\n        \"/packages/from-git\",\n        json={\n            \"git_url\": \"https://github.com/mecapy/boulonnerie.git\",\n            \"git_ref\": \"v1.2.0\",\n            \"deploy_strategy\": \"selective\",\n            \"functions\": [\"calcul-contrainte\", \"calcul-cisaillement\"],\n        },\n    )\n    ```\n\nNotes\n-----\n- Package versions are immutable. To update, increment version in manifest.\n- Function versions are automatically created and linked to package version.\n- Checksums are calculated for audit and integrity verification.\n- Test cases validation (if enabled) runs after deployment.",
+        "operationId": "deploy_package_from_git_packages_from_git_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "organization_slug",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Attach package to this organization",
+              "title": "Organization Slug"
+            },
+            "description": "Attach package to this organization"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PackageFromGitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageDeployResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/from-zip": {
+      "post": {
+        "tags": [
+          "packages"
+        ],
+        "summary": "Deploy Package From Zip",
+        "description": "Deploy a multi-function package from a ZIP archive.\n\nAccepts a ZIP file containing a ``mecapy.yml`` manifest and the package\nsource code. The archive may be flat (files at root) or wrapped in a single\ntop-level directory (as produced by ``git archive`` or GitHub's Download ZIP).\n\nThe deployment pipeline is identical to ``/packages/from-git`` starting from\nmanifest parsing — the only difference is the source acquisition step.\n\nParameters\n----------\nfile : UploadFile\n    ZIP archive (.zip). Maximum 50 MB.\ndeploy_strategy : str\n    ``\"all\"`` to deploy every function, ``\"selective\"`` to deploy only the\n    functions listed in the ``functions`` form field.\nfunctions : str, optional\n    Comma-separated function names (only used when ``deploy_strategy=\"selective\"``).\n\nReturns\n-------\nPackageDeployResponse\n    Same structure as ``/packages/from-git``.\n\nRaises\n------\nHTTPException\n    - 400: Invalid ZIP, manifest not found, or malformed manifest\n    - 409: Package version conflict\n    - 413: Archive too large (> 50 MB)\n    - 422: Code validation failed\n    - 500: Unexpected deployment error",
+        "operationId": "deploy_package_from_zip_packages_from_zip_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "organization_slug",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Attach package to this organization",
+              "title": "Organization Slug"
+            },
+            "description": "Attach package to this organization"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_deploy_package_from_zip_packages_from_zip_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageDeployResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/{package_id}/versions/from-git": {
+      "post": {
+        "tags": [
+          "packages"
+        ],
+        "summary": "Update Package From Git",
+        "description": "Update an existing package by deploying a new version from Git.\n\nThe caller must own the package. The manifest version must match the\nexisting package name and be strictly greater than the current version.\n\nRaises\n------\nHTTPException\n    - 404: Package not found or manifest missing\n    - 403: Caller is not the package owner\n    - 409: Name mismatch, version conflict, or version not incremented\n    - 422: Function extraction failed\n    - 500: Git clone or unexpected failure",
+        "operationId": "update_package_from_git_packages__package_id__versions_from_git_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PackageUpdateFromGitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageDeployResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/{package_id}/versions/from-zip": {
+      "post": {
+        "tags": [
+          "packages"
+        ],
+        "summary": "Update Package From Zip",
+        "description": "Update an existing package by uploading a new version as a ZIP archive.\n\nMirrors :func:`update_package_from_git` but reads the sources from a ZIP\nupload instead of a Git repository. Only the package owner may call this.\n\nRaises\n------\nHTTPException\n    - 400: Invalid ZIP, manifest not found, or malformed manifest\n    - 403: Caller is not the package owner\n    - 404: Package not found\n    - 409: Name mismatch or version not incremented\n    - 413: Archive too large (> 50 MB)\n    - 422: Function extraction failed",
+        "operationId": "update_package_from_zip_packages__package_id__versions_from_zip_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_update_package_from_zip_packages__package_id__versions_from_zip_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageDeployResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations": {
+      "get": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "List My Organizations",
+        "description": "List organizations the current user belongs to (FRO-org-02).",
+        "operationId": "list_my_organizations_organizations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Create Organization",
+        "description": "Create an organization. The creator is automatically added as Admin (FRO-org-01).",
+        "operationId": "create_organization_organizations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ]
+      }
+    },
+    "/organizations/{slug}": {
+      "get": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Get Organization",
+        "description": "Get the detail of an organization — members + role — restricted to members (FRO-org-03).",
+        "operationId": "get_organization_organizations__slug__get",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Delete Organization",
+        "description": "Delete an organization (FRO-org-05). Admin-only, slug confirmation required, no packages attached.",
+        "operationId": "delete_organization_organizations__slug__delete",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationDeleteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{slug}/members/{user_id}": {
+      "patch": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Update Member Role",
+        "description": "Change the role of a member (FRO-org-07). Admin-only, enforces FRO-org-06.",
+        "operationId": "update_member_role_organizations__slug__members__user_id__patch",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationMemberUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/types/catalog": {
+      "get": {
+        "tags": [
+          "types"
+        ],
+        "summary": "Get Types Catalog",
+        "description": "Return the canonical type catalog grouped by category.",
+        "operationId": "get_types_catalog_types_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TypesCatalogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/types/check-connection": {
+      "post": {
+        "tags": [
+          "types"
+        ],
+        "summary": "Check Connection Route",
+        "description": "Check whether a source output type can feed a target input type.\n\nUsed by the workflow editor (pre-validation) and by the workflow API\n(validation at save time). Returns ALLOWED with a reason or REFUSED\nwith a reason.",
+        "operationId": "check_connection_route_types_check_connection_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckConnectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckConnectionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Create Workflow",
+        "description": "Create a new empty workflow. Owner becomes the current user.",
+        "operationId": "create_workflow_workflows_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "List Workflows",
+        "description": "List workflows accessible to the current user (or anonymous for public).\n\nNote: visibility is computed per workflow (FRO-wkf-10) from its latest\nversion graph. For large lists this means one fv_to_package lookup per\nworkflow — acceptable at the current scale, will be batched if needed.\n\nArchive filter (FRO-wkf-18): by default only ``active`` workflows are\nlisted. Pass ``include_archived=true`` to include archived workflows\nowned by the current user (anonymous callers always get the active\nsubset only).",
+        "operationId": "list_workflows_workflows_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "include_archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include workflows that have been archived (FRO-wkf-18). Only the archived workflows owned by the current user are returned, anonymous callers never see archived items.",
+              "default": false,
+              "title": "Include Archived"
+            },
+            "description": "Include workflows that have been archived (FRO-wkf-18). Only the archived workflows owned by the current user are returned, anonymous callers never see archived items."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{slug}": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Get Workflow",
+        "description": "Return full workflow detail (including latest version graph) if accessible.",
+        "operationId": "get_workflow_workflows__slug__get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Delete Workflow",
+        "description": "Hard-delete a workflow and its internal structure (FRO-wkf-19).\n\nPre-conditions (FRO-wkf-18 + FRO-arch-01 invariant):\n\n1. Workflow must already be in ``archived`` state (force the 2-step\n   pattern: archive first, then delete). Otherwise: 409\n   ``not_archived``.\n2. No run of this workflow may be ``qa_tracked = True`` — those runs\n   and their cited artefacts are qa-locked. Otherwise: 409\n   ``qa_tracked_runs_exist``.\n\nOn success: deletes the non-qa-tracked runs explicitly (FK\nworkflow_runs.workflow_version_id is RESTRICT to protect the audit\ntrail), then deletes the workflow. The CASCADE FKs on\nworkflow_versions / workflow_nodes / workflow_edges propagate\nautomatically (FRO-wkf-19 phase 1.B migration).",
+        "operationId": "delete_workflow_workflows__slug__delete",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{slug}/archive": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Archive Workflow",
+        "description": "Soft-archive a workflow (FRO-wkf-18).\n\nIdempotent: archiving an already-archived workflow is a no-op (the\noriginal ``archived_at`` timestamp is preserved). Reversible via\nPOST /workflows/{slug}/unarchive.\n\nAn archived workflow:\n  - disappears from the default list (callers must pass\n    ``include_archived=true`` to GET /workflows to see it),\n  - blocks new versions (POST /workflows/{slug}/versions → 409),\n  - blocks new runs (POST /workflows/{slug}/runs → 409),\n  - unlocks the hard-delete path (DELETE /workflows/{slug}).\n\nExisting versions and historical runs remain readable in any case.",
+        "operationId": "archive_workflow_workflows__slug__archive_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{slug}/unarchive": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Unarchive Workflow",
+        "description": "Re-activate an archived workflow (FRO-wkf-18).\n\nIdempotent: unarchiving an active workflow is a no-op. Resets\n``archived_at`` to NULL — the workflow becomes editable again\n(new versions, new runs allowed).",
+        "operationId": "unarchive_workflow_workflows__slug__unarchive_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{slug}/versions": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Save Workflow Version",
+        "description": "Persist a new version of the workflow graph.\n\nRuns full static validation (typing + cycle + dangling refs). On any\nviolation returns 409 with a structured report.\n\nFRO-wkf-18: refuses to save a new version on an archived workflow\n(409 ``workflow_archived``). Unarchive first.",
+        "operationId": "save_workflow_version_workflows__slug__versions_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowVersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{slug}/validate": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Validate Workflow Version",
+        "description": "Dry-run validation of a workflow graph without persisting anything.\n\nRuns the same static analysis as :func:`save_workflow_version` (typing\nvia sous-typage, cycles, dangling FK/ports, duplicate target ports,\nmissing io_spec) and returns the structured report as the 200 body.\n\nThe frontend \"Validate\" button (FRO-wkf-03) hits this endpoint so the\nauthor can inspect issues before committing. Owner-only: only the\ncaller who owns the workflow can run validation on its graph.",
+        "operationId": "validate_workflow_version_workflows__slug__validate_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowVersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Validate Workflow Version Workflows  Slug  Validate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{slug}/runs": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Submit Workflow Run",
+        "description": "Create a workflow run and freeze its execution plan.\n\nValidates the submission (including the ``inputs`` dict keyed by\nInputNode ``node_key``), builds the execution plan (fusion + topological\nwaves), stores it on the ``workflow_runs`` row, and marks the run as\n``pending``. The execution loop runs separately via\n``POST /workflow-runs/{id}/tick`` (Phase 4b).\n\nReturns 201 with the created run; the caller polls ``GET /workflow-runs/{id}``\nfor status updates.",
+        "operationId": "submit_workflow_run_workflows__slug__runs_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflow-runs": {
+      "get": {
+        "tags": [
+          "workflow-runs"
+        ],
+        "summary": "List Workflow Runs",
+        "description": "List workflow runs owned by the current user.",
+        "operationId": "list_workflow_runs_workflow_runs_get",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowRunListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflow-runs/{run_id}": {
+      "get": {
+        "tags": [
+          "workflow-runs"
+        ],
+        "summary": "Get Workflow Run",
+        "description": "Return the detail of a run if the caller is allowed to see it.\n\nA run is visible only to the user who submitted it (v1). Future iterations\nmay expose public runs of public workflows.",
+        "operationId": "get_workflow_run_workflow_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflow-runs/{run_id}/plan": {
+      "get": {
+        "tags": [
+          "workflow-runs"
+        ],
+        "summary": "Get Workflow Run Plan",
+        "description": "Expose the frozen execution plan of a run (audit / debugging).",
+        "operationId": "get_workflow_run_plan_workflow_runs__run_id__plan_get",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflow-runs/{run_id}/tick": {
+      "post": {
+        "tags": [
+          "workflow-runs"
+        ],
+        "summary": "Tick Workflow Run",
+        "description": "Advance a workflow run by one orchestration tick (Phase 4b).\n\nDrives the run's state machine without any background task: polls\nin-flight jobs, writes outputs that arrived since the last call, submits\nnewly ready nodes, and finalises the run's status when a terminal\ncondition is reached. Callers (frontend poll, cron, tests) invoke this\nrepeatedly until ``status`` becomes ``completed``, ``failed`` or\n``cancelled``.\n\nAccess control: only the run's owner can tick (same rule as GET).\nIdempotent: calling twice with no worker progress in between yields the\nsame state.",
+        "operationId": "tick_workflow_run_workflow_runs__run_id__tick_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflow-runs/{run_id}/qa-track": {
+      "post": {
+        "tags": [
+          "workflow-runs"
+        ],
+        "summary": "Qa Track Workflow Run",
+        "description": "Mark a workflow run as part of the user's quality dossier (FRO-jobs-10).\n\nAccess control: only the run's owner can toggle qa-tracking. Idempotent:\ncalling twice on an already-tracked run is a no-op (returns 200 with the\ncurrent state, ``qa_tracked_at`` is left untouched to preserve the\n*first toggle* audit timestamp).\n\nSetting ``qa_tracked = True`` makes the run a member of the user's QA\ndossier (FRO-arch-01) — the run is excluded from the automatic purge\n(FRO-arch-02 / FRO-jobs-09) and the artefacts it cites become\nqa-locked (cannot be hard-deleted while the run remains tracked).",
+        "operationId": "qa_track_workflow_run_workflow_runs__run_id__qa_track_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflow-runs/{run_id}/qa-untrack": {
+      "post": {
+        "tags": [
+          "workflow-runs"
+        ],
+        "summary": "Qa Untrack Workflow Run",
+        "description": "Remove a workflow run from the user's quality dossier (FRO-jobs-10).\n\nAccess control: only the run's owner can toggle qa-tracking. Idempotent:\ncalling on an already-untracked run is a no-op (returns 200).\n\nSetting ``qa_tracked = False`` releases the qa-lock on cited artefacts\n(provided no other qa-tracked run still cites them). The audit fields\n``qa_tracked_at`` and ``qa_tracked_by`` are reset to ``None`` — a\nsubsequent qa-track will record a fresh \"first toggle\" timestamp.\n\nFuture: the spec FRO-jobs-10 mandates a 409 when the run is attached\nto an active Study (FRO-study-*). Branche dormante — Study not yet\nimplemented (cf. FRO-study-01 ``[future]``).",
+        "operationId": "qa_untrack_workflow_run_workflow_runs__run_id__qa_untrack_post",
+        "security": [
+          {
+            "OAuth2AuthorizationCodeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check Endpoint",
+        "description": "Comprehensive health check including database connectivity.\n\nReturns\n-------\n    dict: Health status of the application and its components",
+        "operationId": "health_check_endpoint_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_deploy_package_from_zip_packages_from_zip_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File",
+            "description": "ZIP archive containing mecapy.yml and package source"
+          },
+          "deploy_strategy": {
+            "type": "string",
+            "pattern": "^(all|selective)$",
+            "title": "Deploy Strategy",
+            "default": "all"
+          },
+          "functions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Functions",
+            "description": "Comma-separated function names for selective strategy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_deploy_package_from_zip_packages_from_zip_post"
+      },
+      "Body_update_package_from_zip_packages__package_id__versions_from_zip_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File",
+            "description": "ZIP archive containing mecapy.yml and package source"
+          },
+          "deploy_strategy": {
+            "type": "string",
+            "pattern": "^(all|selective)$",
+            "title": "Deploy Strategy",
+            "default": "all"
+          },
+          "functions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Functions",
+            "description": "Comma-separated function names for selective strategy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_update_package_from_zip_packages__package_id__versions_from_zip_post"
+      },
+      "Body_upload_function_file_packages__package_id__functions__function_name__uploads_post": {
+        "properties": {
+          "var_name": {
+            "type": "string",
+            "title": "Var Name",
+            "description": "Function input variable bound to this file"
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File",
+            "description": "File payload (any binary content)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "var_name",
+          "file"
+        ],
+        "title": "Body_upload_function_file_packages__package_id__functions__function_name__uploads_post"
+      },
+      "CanonicalTypeModel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields"
+          },
+          "element_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Element Type"
+          },
+          "length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "category"
+        ],
+        "title": "CanonicalTypeModel",
+        "description": "Public representation of a canonical catalog entry."
+      },
+      "CheckConnectionRequest": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Source type expression"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "description": "Target type expression"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "target"
+        ],
+        "title": "CheckConnectionRequest",
+        "description": "Payload for POST /types/check-connection."
+      },
+      "CheckConnectionResponse": {
+        "properties": {
+          "compatibility": {
+            "type": "string",
+            "title": "Compatibility",
+            "description": "Either \"ALLOWED\" or \"REFUSED\""
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Human-readable explanation for the verdict"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Normalized source expression"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "description": "Normalized target expression"
+          }
+        },
+        "type": "object",
+        "required": [
+          "compatibility",
+          "reason",
+          "source",
+          "target"
+        ],
+        "title": "CheckConnectionResponse",
+        "description": "Verdict returned by POST /types/check-connection."
+      },
+      "FileUploadResponse": {
+        "properties": {
+          "upload_id": {
+            "type": "string",
+            "title": "Upload Id",
+            "description": "Stable identifier for the uploaded file (UUID)"
+          },
+          "var_name": {
+            "type": "string",
+            "title": "Var Name",
+            "description": "Function input variable this file is bound to"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Original filename as sent by the client"
+          },
+          "extension": {
+            "type": "string",
+            "title": "Extension",
+            "description": "Lowercased extension without the leading dot (empty string if none)"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size Bytes",
+            "description": "Total size of the uploaded payload"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type",
+            "description": "MIME type as declared by the client (best-effort, not validated)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload_id",
+          "var_name",
+          "filename",
+          "extension",
+          "size_bytes"
+        ],
+        "title": "FileUploadResponse",
+        "description": "Metadata returned after a successful File upload."
+      },
+      "FunctionExecuteRequest": {
+        "properties": {
+          "payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload",
+            "description": "Input data for the function"
+          },
+          "file_inputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Inputs",
+            "description": "Mapping of File-typed input variable names to upload IDs returned by POST /packages/{id}/functions/{name}/uploads. The API resolves each upload, fetches its content from S3, and stages it under /workspace/in/files/<var>.<ext> per FRO-runtime-02."
+          },
+          "async_execution": {
+            "type": "boolean",
+            "title": "Async Execution",
+            "description": "Whether to execute asynchronously",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "FunctionExecuteRequest",
+        "description": "Request model for executing a function."
+      },
+      "FunctionIoSpec": {
+        "properties": {
+          "inputs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TypedPortInfo"
+            },
+            "type": "object",
+            "title": "Inputs",
+            "description": "Map of input port name to its typed descriptor."
+          },
+          "outputs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TypedPortInfo"
+            },
+            "type": "object",
+            "title": "Outputs",
+            "description": "Map of output port name to its typed descriptor."
+          }
+        },
+        "type": "object",
+        "title": "FunctionIoSpec",
+        "description": "Typed I/O declaration stored on FunctionVersion.io_spec (FRO-type-02).\n\nNamed explicitly so the generated OpenAPI schema exposes it as a reusable\nreference (avoids inlining as ``dict[str, unknown]`` in the frontend\nclient, which would force consumers to lose the port shape)."
+      },
+      "FunctionVersionDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique function version identifier (UUID)"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Function name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Function description from mecapy.yml"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "Function version (SemVer)"
+          },
+          "handler": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handler",
+            "description": "Import path module:callable (mode A only ; null for modes B/C)"
+          },
+          "entrypoint": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entrypoint",
+            "description": "Container CMD args for runtime kinds dockerfile/image (modes B/C)"
+          },
+          "dockerfile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dockerfile",
+            "description": "Relative path to Dockerfile (mode B only)"
+          },
+          "image_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Ref",
+            "description": "Full registry image reference (mode C only, e.g. 'code-aster:15.4')"
+          },
+          "checksum": {
+            "type": "string",
+            "title": "Checksum",
+            "description": "SHA256 checksum of function code"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Deployment status of this version"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "Creation timestamp"
+          },
+          "io_spec": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FunctionIoSpec"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Typed I/O declaration (FRO-type-02). Canonical catalog types per port."
+          },
+          "package_id": {
+            "type": "string",
+            "title": "Package Id",
+            "description": "ID of the parent package"
+          },
+          "package_name": {
+            "type": "string",
+            "title": "Package Name",
+            "description": "Name of the parent package"
+          },
+          "runtime": {
+            "type": "string",
+            "title": "Runtime",
+            "description": "Runtime environment (e.g. python311)"
+          },
+          "memory_mb": {
+            "type": "integer",
+            "title": "Memory Mb",
+            "description": "Memory limit in MB"
+          },
+          "timeout": {
+            "type": "integer",
+            "title": "Timeout",
+            "description": "Execution timeout in seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "version",
+          "checksum",
+          "status",
+          "created_at",
+          "package_id",
+          "package_name",
+          "runtime",
+          "memory_mb",
+          "timeout"
+        ],
+        "title": "FunctionVersionDetailResponse",
+        "description": "Detailed view of a FunctionVersion (FRO-fn-04).\n\nExtends ``FunctionVersionInfo`` with the parent package context and the\nruntime/resource hints needed to render the function detail page without\nrequiring a second round-trip to fetch the package."
+      },
+      "FunctionVersionInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique function version identifier (UUID)"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Function name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Function description from mecapy.yml"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "Function version (SemVer)"
+          },
+          "handler": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handler",
+            "description": "Import path module:callable (mode A only ; null for modes B/C)"
+          },
+          "entrypoint": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entrypoint",
+            "description": "Container CMD args for runtime kinds dockerfile/image (modes B/C)"
+          },
+          "dockerfile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dockerfile",
+            "description": "Relative path to Dockerfile (mode B only)"
+          },
+          "image_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Ref",
+            "description": "Full registry image reference (mode C only, e.g. 'code-aster:15.4')"
+          },
+          "checksum": {
+            "type": "string",
+            "title": "Checksum",
+            "description": "SHA256 checksum of function code"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Deployment status of this version"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "Creation timestamp"
+          },
+          "io_spec": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FunctionIoSpec"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Typed I/O declaration (FRO-type-02). Canonical catalog types per port."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "version",
+          "checksum",
+          "status",
+          "created_at"
+        ],
+        "title": "FunctionVersionInfo",
+        "description": "Information about a function version within a package."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InputNodeSpec": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "type_expr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ],
+            "title": "Type Expr",
+            "description": "Type expression — canonical name, parameterised (list[T]/dict[str,T]) or inline struct (mapping of field name to nested type_expr)."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": true
+          },
+          "default": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "type_expr"
+        ],
+        "title": "InputNodeSpec",
+        "description": "Payload describing the typed value produced by an InputNode.\n\nThe ``type_expr`` field accepts the same syntax as ``mecapy.yml`` typed\ninputs (FRO-type-02): a plain canonical name (``\"Length\"``, ``\"Force\"``,\n``\"list[Force]\"``) or an inline anonymous struct mapping\n(``{\"d\": \"Length\", \"p\": \"Length\"}``). At validation time the expression\nis parsed via :func:`types_catalog.parse_type`; the resulting\n``TypeSpec`` is used for connection-compatibility checks with downstream\nfunction-port types.\n\nThe InputNode emits its value on a single conventional output port named\n:data:`INPUT_NODE_OUTPUT_PORT` (``\"value\"``)."
+      },
+      "JobListResponse": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobSummary"
+            },
+            "type": "array",
+            "title": "Jobs",
+            "description": "List of jobs"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total"
+        ],
+        "title": "JobListResponse",
+        "description": "Response model for listing user jobs."
+      },
+      "JobLogChunk": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stdout",
+              "stderr"
+            ],
+            "title": "Kind",
+            "description": "Which stream this chunk came from."
+          },
+          "chunk": {
+            "type": "string",
+            "title": "Chunk",
+            "description": "Raw text content as emitted by the container."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "chunk"
+        ],
+        "title": "JobLogChunk",
+        "description": "A single stdout/stderr chunk captured during job execution.\n\nEach chunk reflects exactly what the container emitted on that stream,\nnot a line — Docker may deliver partial lines or multiple lines in a\nsingle chunk depending on output cadence."
+      },
+      "JobLogsResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id",
+            "description": "Job identifier"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/JobLogChunk"
+            },
+            "type": "array",
+            "title": "Entries",
+            "description": "Log chunks emitted since the requested index."
+          },
+          "next_index": {
+            "type": "integer",
+            "title": "Next Index",
+            "description": "Pass this value as ``since`` in the next poll to fetch only new chunks."
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done",
+            "description": "True once the job reached a terminal status (completed / failed / timeout). Frontend should stop polling when this is True."
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "next_index",
+          "done"
+        ],
+        "title": "JobLogsResponse",
+        "description": "Incremental log payload for :spec:`FRO-jobs-08` v2 streaming.\n\nThe frontend polls ``GET /jobs/{id}/logs?since={next_index}`` every\ncouple of seconds while the job is running, appending ``entries`` to\nits local buffer and updating ``next_index`` from the response.\nPolling stops once ``done`` is True (status terminal)."
+      },
+      "JobResultResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id",
+            "description": "Job identifier"
+          },
+          "function_id": {
+            "type": "string",
+            "title": "Function Id",
+            "description": "Function identifier"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus",
+            "description": "Job status"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result",
+            "description": "Function output data"
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputs",
+            "description": "Inputs submitted at job creation (FRO-jobs-08 traceability)."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message if failed"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms",
+            "description": "Execution duration in milliseconds"
+          },
+          "memory_used_mb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Used Mb",
+            "description": "Memory used in MB"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "function_id",
+          "status"
+        ],
+        "title": "JobResultResponse",
+        "description": "Response model for job result retrieval.\n\nNotes\n-----\nExecution logs (stdout/stderr) are no longer part of this payload.\nThey stream live via ``GET /jobs/{id}/logs`` (:spec:`FRO-jobs-08` v2),\nwhich is the single source of truth for log display during and after\na run. The frontend fetches both endpoints — ``/result`` for outputs\n+ inputs, ``/logs`` for stdout/stderr chunks."
+      },
+      "JobStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "completed",
+          "failed",
+          "timeout"
+        ],
+        "title": "JobStatus",
+        "description": "Job execution status."
+      },
+      "JobStatusResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id",
+            "description": "Job identifier"
+          },
+          "function_id": {
+            "type": "string",
+            "title": "Function Id",
+            "description": "Function identifier"
+          },
+          "function_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Function Name",
+            "description": "Human-readable function name"
+          },
+          "function_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Function Version",
+            "description": "Function version (SemVer) used for this job"
+          },
+          "function_checksum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Function Checksum",
+            "description": "SHA256 checksum of the function code"
+          },
+          "package_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Name",
+            "description": "Owning package name"
+          },
+          "package_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Version",
+            "description": "Package version used for this job"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus",
+            "description": "Current job status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message if failed"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "Job start timestamp"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At",
+            "description": "Job completion timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "function_id",
+          "status"
+        ],
+        "title": "JobStatusResponse",
+        "description": "Response model for job status query."
+      },
+      "JobSubmitResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id",
+            "description": "Unique job identifier"
+          },
+          "function_id": {
+            "type": "string",
+            "title": "Function Id",
+            "description": "Function identifier"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus",
+            "description": "Initial job status",
+            "default": "pending"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Status message",
+            "default": "Job submitted successfully"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "function_id"
+        ],
+        "title": "JobSubmitResponse",
+        "description": "Response model for job submission."
+      },
+      "JobSummary": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id",
+            "description": "Job identifier"
+          },
+          "function_id": {
+            "type": "string",
+            "title": "Function Id",
+            "description": "Function identifier"
+          },
+          "function_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Function Name",
+            "description": "Human-readable function name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus",
+            "description": "Current job status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message if failed"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Job submission timestamp"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "Job start timestamp"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At",
+            "description": "Job completion timestamp"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms",
+            "description": "Execution duration in milliseconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "function_id",
+          "status"
+        ],
+        "title": "JobSummary",
+        "description": "Summary of a job for list display."
+      },
+      "OrganizationCreateRequest": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Display Name",
+            "description": "Organization display name"
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 2,
+            "title": "Slug",
+            "description": "URL-safe unique slug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "display_name",
+          "slug"
+        ],
+        "title": "OrganizationCreateRequest",
+        "description": "Request body for creating an organization."
+      },
+      "OrganizationDeleteRequest": {
+        "properties": {
+          "confirm_slug": {
+            "type": "string",
+            "title": "Confirm Slug",
+            "description": "Must match the organization slug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "confirm_slug"
+        ],
+        "title": "OrganizationDeleteRequest",
+        "description": "Request body for deleting an organization (slug confirmation)."
+      },
+      "OrganizationListResponse": {
+        "properties": {
+          "organizations": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationSummary"
+            },
+            "type": "array",
+            "title": "Organizations"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of memberships for the user"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total"
+        ],
+        "title": "OrganizationListResponse",
+        "description": "List response for the current user's organizations."
+      },
+      "OrganizationMemberResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "User ID"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "User email (best-effort)"
+          },
+          "role": {
+            "$ref": "#/components/schemas/OrganizationRole",
+            "description": "Role in the organization"
+          },
+          "joined_at": {
+            "type": "string",
+            "title": "Joined At",
+            "description": "ISO timestamp of join"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "role",
+          "joined_at"
+        ],
+        "title": "OrganizationMemberResponse",
+        "description": "A member within an organization."
+      },
+      "OrganizationMemberUpdateRequest": {
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/OrganizationRole",
+            "description": "New role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "OrganizationMemberUpdateRequest",
+        "description": "Request body for updating a member's role."
+      },
+      "OrganizationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Organization ID"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug",
+            "description": "Organization slug"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "Display name"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "ISO creation timestamp"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationMemberResponse"
+            },
+            "type": "array",
+            "title": "Members",
+            "description": "Members of the organization"
+          },
+          "member_count": {
+            "type": "integer",
+            "title": "Member Count",
+            "description": "Total number of members"
+          },
+          "admin_count": {
+            "type": "integer",
+            "title": "Admin Count",
+            "description": "Total number of admins"
+          },
+          "my_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizationRole"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Role of the current authenticated user (None if not a member)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "display_name",
+          "created_at",
+          "member_count",
+          "admin_count"
+        ],
+        "title": "OrganizationResponse",
+        "description": "Full organization payload."
+      },
+      "OrganizationRole": {
+        "type": "string",
+        "enum": [
+          "user",
+          "admin"
+        ],
+        "title": "OrganizationRole",
+        "description": "Role of a user within an organization."
+      },
+      "OrganizationSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Organization ID"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug",
+            "description": "Organization slug"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "Display name"
+          },
+          "my_role": {
+            "$ref": "#/components/schemas/OrganizationRole",
+            "description": "Role of the current user"
+          },
+          "member_count": {
+            "type": "integer",
+            "title": "Member Count",
+            "description": "Total number of members"
+          },
+          "package_count": {
+            "type": "integer",
+            "title": "Package Count",
+            "description": "Total number of packages attached",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "display_name",
+          "my_role",
+          "member_count"
+        ],
+        "title": "OrganizationSummary",
+        "description": "Lightweight organization entry for listings."
+      },
+      "PackageDeployResponse": {
+        "properties": {
+          "package": {
+            "$ref": "#/components/schemas/PackageResponse",
+            "description": "Deployed package information"
+          },
+          "functions_deployed": {
+            "type": "integer",
+            "title": "Functions Deployed",
+            "description": "Number of functions deployed"
+          },
+          "functions_updated": {
+            "type": "integer",
+            "title": "Functions Updated",
+            "description": "Number of functions updated",
+            "default": 0
+          },
+          "functions_unchanged": {
+            "type": "integer",
+            "title": "Functions Unchanged",
+            "description": "Number of functions unchanged",
+            "default": 0
+          },
+          "validation_results": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Results",
+            "description": "Test case validation results if enabled"
+          },
+          "deployment_qualified": {
+            "type": "boolean",
+            "title": "Deployment Qualified",
+            "description": "Whether deployment passed all validations",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "package",
+          "functions_deployed"
+        ],
+        "title": "PackageDeployResponse",
+        "description": "Response model for package deployment."
+      },
+      "PackageFromGitRequest": {
+        "properties": {
+          "git_url": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Git Url",
+            "description": "Git repository URL (HTTPS or SSH)",
+            "examples": [
+              "https://github.com/user/mecapy-boulonnerie.git"
+            ]
+          },
+          "git_ref": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Git Ref",
+            "description": "Git reference (branch, tag, or commit SHA)",
+            "default": "main",
+            "examples": [
+              "main",
+              "v1.0.0",
+              "abc123def"
+            ]
+          },
+          "git_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Token",
+            "description": "Personal access token for private repositories"
+          },
+          "deploy_strategy": {
+            "type": "string",
+            "pattern": "^(all|selective)$",
+            "title": "Deploy Strategy",
+            "description": "Deployment strategy: 'all' (deploy all functions) or 'selective'",
+            "default": "all"
+          },
+          "functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Functions",
+            "description": "List of function names to deploy (only for 'selective' strategy)",
+            "examples": [
+              [
+                "calcul-contrainte",
+                "calcul-cisaillement"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "git_url"
+        ],
+        "title": "PackageFromGitRequest",
+        "description": "Request model for creating a package from Git repository."
+      },
+      "PackageListResponse": {
+        "properties": {
+          "packages": {
+            "items": {
+              "$ref": "#/components/schemas/PackageResponse"
+            },
+            "type": "array",
+            "title": "Packages",
+            "description": "List of packages"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of packages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "packages",
+          "total"
+        ],
+        "title": "PackageListResponse",
+        "description": "Response model for listing packages."
+      },
+      "PackageResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique package identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Package name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Package description"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "Package version (SemVer)"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PackageStatus",
+            "description": "Package status"
+          },
+          "git_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Url",
+            "description": "Git repository URL"
+          },
+          "git_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Ref",
+            "description": "Git reference"
+          },
+          "git_commit_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Commit Sha",
+            "description": "Git commit SHA"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author",
+            "description": "Package author"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License",
+            "description": "License (MIT, Apache-2.0, etc.)"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category",
+            "description": "Package category"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags",
+            "description": "Tags for categorization"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/PackageVisibility",
+            "description": "Package visibility (private/internal/public)",
+            "default": "private"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id",
+            "description": "ID of the organization this package belongs to (None for personal packages)"
+          },
+          "organization_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Slug",
+            "description": "Slug of the organization this package belongs to (convenience field)"
+          },
+          "is_archived": {
+            "type": "boolean",
+            "title": "Is Archived",
+            "description": "Whether this package is archived",
+            "default": false
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At",
+            "description": "Timestamp when the package was archived"
+          },
+          "yanked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yanked At",
+            "description": "Timestamp when the package was yanked (retired from public discoverability while preserving downstream references)"
+          },
+          "functions": {
+            "items": {
+              "$ref": "#/components/schemas/FunctionVersionInfo"
+            },
+            "type": "array",
+            "title": "Functions",
+            "description": "Functions in this package"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "Package creation timestamp"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "Last update timestamp"
+          },
+          "owner_id": {
+            "type": "string",
+            "title": "Owner Id",
+            "description": "User ID of the package owner"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "version",
+          "status",
+          "created_at",
+          "updated_at",
+          "owner_id"
+        ],
+        "title": "PackageResponse",
+        "description": "Response model for package information."
+      },
+      "PackageStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "deploying",
+          "ready",
+          "error",
+          "updating"
+        ],
+        "title": "PackageStatus",
+        "description": "Package deployment status."
+      },
+      "PackageUpdateFromGitRequest": {
+        "properties": {
+          "git_url": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Git Url",
+            "description": "Git repository URL (HTTPS or SSH)"
+          },
+          "git_ref": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Git Ref",
+            "description": "Git reference (branch, tag, or commit SHA)",
+            "default": "main"
+          },
+          "git_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Token",
+            "description": "Personal access token for private repositories"
+          },
+          "deploy_strategy": {
+            "type": "string",
+            "pattern": "^(all|selective)$",
+            "title": "Deploy Strategy",
+            "description": "Deployment strategy: 'all' (deploy all functions) or 'selective'",
+            "default": "all"
+          },
+          "functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Functions",
+            "description": "List of function names to deploy (only for 'selective' strategy)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "git_url"
+        ],
+        "title": "PackageUpdateFromGitRequest",
+        "description": "Request model for updating an existing package from a Git repository.\n\nUnlike :class:`PackageFromGitRequest`, this does not create a new package —\nit adds a new :class:`PackageVersion` to an existing package. The manifest\nmust reference the same package name and declare a version strictly greater\nthan the current one (SemVer)."
+      },
+      "PackageVisibility": {
+        "type": "string",
+        "enum": [
+          "private",
+          "internal",
+          "public"
+        ],
+        "title": "PackageVisibility",
+        "description": "Package visibility — controls read/execute access.\n\n- ``private`` : only the owner can view and execute.\n- ``internal`` : all members of the owner's organization can view and execute.\n  Requires the package to be attached to an organization.\n- ``public`` : any user (including unauthenticated ones, for read) can view.\n  Execution still requires authentication."
+      },
+      "PackageVisibilityUpdate": {
+        "properties": {
+          "visibility": {
+            "$ref": "#/components/schemas/PackageVisibility",
+            "description": "New visibility value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visibility"
+        ],
+        "title": "PackageVisibilityUpdate",
+        "description": "Request model to update package visibility."
+      },
+      "TypedPortInfo": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Canonical type expression — nominal name (``Force``, ``Length``), generic (``list[Force]``, ``Literal[\"a\", \"b\"]``), or a struct object."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable port description from mecapy.yml."
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "description": "Whether the port must be provided at execution time.",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "TypedPortInfo",
+        "description": "Single typed I/O port on a function (FRO-type-02)."
+      },
+      "TypesCatalogResponse": {
+        "properties": {
+          "types": {
+            "items": {
+              "$ref": "#/components/schemas/CanonicalTypeModel"
+            },
+            "type": "array",
+            "title": "Types"
+          },
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Categories",
+            "description": "Ordered list of categories present in the catalog."
+          }
+        },
+        "type": "object",
+        "required": [
+          "types"
+        ],
+        "title": "TypesCatalogResponse",
+        "description": "Payload returned by GET /types/catalog."
+      },
+      "UserInfo": {
+        "properties": {
+          "sub": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub"
+          },
+          "preferred_username": {
+            "type": "string",
+            "title": "Preferred Username"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "given_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Given Name"
+          },
+          "family_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family Name"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "preferred_username"
+        ],
+        "title": "UserInfo",
+        "description": "User information model extracted from JWT token."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WorkflowCreateRequest": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "organization_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Slug",
+            "description": "Attach the workflow to an organization (optional)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name"
+        ],
+        "title": "WorkflowCreateRequest",
+        "description": "Payload for POST /workflows."
+      },
+      "WorkflowEdgeModel": {
+        "properties": {
+          "source_node_key": {
+            "type": "string",
+            "title": "Source Node Key"
+          },
+          "source_port": {
+            "type": "string",
+            "title": "Source Port"
+          },
+          "target_node_key": {
+            "type": "string",
+            "title": "Target Node Key"
+          },
+          "target_port": {
+            "type": "string",
+            "title": "Target Port"
+          },
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alias"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_node_key",
+          "source_port",
+          "target_node_key",
+          "target_port"
+        ],
+        "title": "WorkflowEdgeModel",
+        "description": "Edge connecting two node ports inside a workflow version.\n\n``alias`` is optional and only meaningful when the target port is\ndict-like (``Object`` or ``dict[str, T]``) — it overrides the dict key\nused by the orchestrator when aggregating multi-fanin edges into a\nsingle value at runtime (FRO-wkf-04c). For scalar (single-fanin) targets\nthe alias has no runtime effect; the editor hides the field accordingly."
+      },
+      "WorkflowListResponse": {
+        "properties": {
+          "workflows": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowSummary"
+            },
+            "type": "array",
+            "title": "Workflows"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "workflows",
+          "total"
+        ],
+        "title": "WorkflowListResponse",
+        "description": "Payload for GET /workflows."
+      },
+      "WorkflowNodeModel": {
+        "properties": {
+          "node_key": {
+            "type": "string",
+            "title": "Node Key"
+          },
+          "node_kind": {
+            "type": "string",
+            "enum": [
+              "function",
+              "input"
+            ],
+            "title": "Node Kind",
+            "default": "function"
+          },
+          "function_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Function Version Id"
+          },
+          "input_spec": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InputNodeSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position_x": {
+            "type": "number",
+            "title": "Position X",
+            "default": 0.0
+          },
+          "position_y": {
+            "type": "number",
+            "title": "Position Y",
+            "default": 0.0
+          },
+          "custom_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_key"
+        ],
+        "title": "WorkflowNodeModel",
+        "description": "Node inside a workflow version.\n\nDiscriminated by :attr:`node_kind`. Function-kind nodes carry\n``function_version_id`` (the pinned FV whose handler executes at runtime).\nInput-kind nodes carry :attr:`input_spec` (the typed value supplied by\nthe user at run submission). Exactly one of the two must be populated —\nenforced by the post-init validator below."
+      },
+      "WorkflowResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "owner_id": {
+            "type": "string",
+            "title": "Owner Id"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "organization_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Slug"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowVersionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "visibility_effective": {
+            "type": "string",
+            "title": "Visibility Effective",
+            "description": "Computed visibility: private | internal@<org_slug> | public"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "description",
+          "owner_id",
+          "organization_id",
+          "organization_slug",
+          "created_at",
+          "updated_at",
+          "latest_version",
+          "visibility_effective"
+        ],
+        "title": "WorkflowResponse",
+        "description": "Full workflow detail exposed by GET /workflows/{slug}."
+      },
+      "WorkflowRunListResponse": {
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowRunSummary"
+            },
+            "type": "array",
+            "title": "Runs"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "runs",
+          "total"
+        ],
+        "title": "WorkflowRunListResponse",
+        "description": "Payload for GET /workflow-runs."
+      },
+      "WorkflowRunRequest": {
+        "properties": {
+          "inputs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Inputs",
+            "description": "Values supplied to InputNodes keyed by ``node_key``. Each value is the whole typed payload (scalar / list / dict / struct) declared by the InputNode's ``input_spec.type_expr``."
+          }
+        },
+        "type": "object",
+        "title": "WorkflowRunRequest",
+        "description": "Payload for POST /workflows/{slug}/runs."
+      },
+      "WorkflowRunResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "workflow_version_id": {
+            "type": "string",
+            "title": "Workflow Version Id"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputs"
+          },
+          "terminal_outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminal Outputs"
+          },
+          "visibility_snapshot": {
+            "type": "string",
+            "title": "Visibility Snapshot"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "first_failed_node_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Failed Node Key"
+          },
+          "node_states": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node States"
+          },
+          "plan_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Snapshot"
+          },
+          "qa_tracked": {
+            "type": "boolean",
+            "title": "Qa Tracked",
+            "default": false
+          },
+          "qa_tracked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa Tracked At"
+          },
+          "qa_tracked_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa Tracked By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "workflow_version_id",
+          "user_id",
+          "status",
+          "started_at",
+          "completed_at",
+          "terminal_outputs",
+          "visibility_snapshot",
+          "error_message",
+          "first_failed_node_key"
+        ],
+        "title": "WorkflowRunResponse",
+        "description": "Detail of a workflow run."
+      },
+      "WorkflowRunSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "workflow_slug": {
+            "type": "string",
+            "title": "Workflow Slug"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "qa_tracked": {
+            "type": "boolean",
+            "title": "Qa Tracked",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "workflow_slug",
+          "status",
+          "started_at",
+          "completed_at",
+          "duration_ms"
+        ],
+        "title": "WorkflowRunSummary",
+        "description": "Row-sized projection for GET /workflow-runs (list)."
+      },
+      "WorkflowSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "owner_id": {
+            "type": "string",
+            "title": "Owner Id"
+          },
+          "organization_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Slug"
+          },
+          "node_count": {
+            "type": "integer",
+            "title": "Node Count"
+          },
+          "visibility_effective": {
+            "type": "string",
+            "title": "Visibility Effective"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "owner_id",
+          "organization_slug",
+          "node_count",
+          "visibility_effective",
+          "updated_at"
+        ],
+        "title": "WorkflowSummary",
+        "description": "Card-sized projection used by GET /workflows (list)."
+      },
+      "WorkflowVersionRequest": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowNodeModel"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowEdgeModel"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "type": "object",
+        "title": "WorkflowVersionRequest",
+        "description": "Payload for saving a new workflow version (POST /workflows/{slug}/versions)."
+      },
+      "WorkflowVersionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "is_latest": {
+            "type": "boolean",
+            "title": "Is Latest"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowNodeModel"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowEdgeModel"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "is_latest",
+          "created_at",
+          "nodes",
+          "edges"
+        ],
+        "title": "WorkflowVersionResponse",
+        "description": "Public read shape of a workflow version including its graph."
+      }
+    },
+    "securitySchemes": {
+      "OAuth2AuthorizationCodeBearer": {
+        "type": "oauth2",
+        "flows": {
+          "authorizationCode": {
+            "scopes": {},
+            "authorizationUrl": "http://localhost:8080/realms/mecapy/protocol/openid-connect/auth",
+            "tokenUrl": "http://localhost:8080/realms/mecapy/protocol/openid-connect/token"
+          }
+        }
+      }
+    }
+  }
+}
