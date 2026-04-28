@@ -4819,8 +4819,8 @@
         "flows": {
           "authorizationCode": {
             "scopes": {},
-            "authorizationUrl": "http://localhost:8080/realms/mecapy/protocol/openid-connect/auth",
-            "tokenUrl": "http://localhost:8080/realms/mecapy/protocol/openid-connect/token"
+            "authorizationUrl": "https://auth.mecapy.com/realms/mecapy/protocol/openid-connect/auth",
+            "tokenUrl": "https://auth.mecapy.com/realms/mecapy/protocol/openid-connect/token"
           }
         }
       }
