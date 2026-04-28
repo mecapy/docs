@@ -782,7 +782,7 @@ Before publishing a package, verify:
 
 ## References
 
-- [MANIFEST_FORMAT.md](./MANIFEST_FORMAT.md) - Full manifest specification
+- [MANIFEST_FORMAT.md](../manifest/syntax) - Full manifest specification
 - [Pydantic Field Documentation](https://docs.pydantic.dev/latest/concepts/fields/)
 - [JSON Schema Specification](https://json-schema.org/understanding-json-schema/)
 - [NumPy Docstring Standard](https://numpydoc.readthedocs.io/en/latest/format.html)

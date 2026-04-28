@@ -29,7 +29,7 @@ functions:
     init: [diameter, material_grade]
 ```
 
-**Learn more**: [Manifest Format](packages/MANIFEST_FORMAT)
+**Learn more**: [Manifest Format](manifest/syntax)
 
 ### Type-Safe Parameters
 
@@ -188,7 +188,7 @@ result = client.functions.execute(
 
 ### Package Development
 
-- [Manifest Format](packages/MANIFEST_FORMAT) - Package configuration
+- [Manifest Format](manifest/syntax) - Package configuration
 - [Standard Types](packages/STANDARD_TYPES_GUIDE) - Type system reference
 - [Multi-Function Packages](packages/PACKAGE_MULTI_FUNCTIONS) - Advanced patterns
 - [Versioning](packages/VERSIONING_STRATEGY) - Version management
@@ -219,7 +219,7 @@ Ready to deploy your first scientific function?
   Learn how to create and deploy your first MecaPy package
 </Card>
 
-<Card title="Package Development" icon="code" href="packages/MANIFEST_FORMAT">
+<Card title="Package Development" icon="code" href="manifest/syntax">
   Dive into package development with the manifest format
 </Card>
 
