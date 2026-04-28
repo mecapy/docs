@@ -94,7 +94,8 @@
     {
       "group": "Runtime",
       "pages": [
-        "runtime/contract"
+        "runtime/contract",
+        "runtime/recipes"
       ]
     },
     {

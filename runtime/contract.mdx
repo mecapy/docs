@@ -10,9 +10,11 @@ no Python library is required at the boundary, which is what allows
 modes B (`runtime.kind: dockerfile`) and C (`runtime.kind: image`) to
 ship images written in any language.
 
-A future `mecapy-runtime` SDK will sugar this contract for Python users,
-but the contract below is what the worker actually enforces and is the
-source of truth.
+The contract below is the source of truth — what the worker actually
+enforces. For mode-A (Python) functions you don't write to the contract
+directly; the embedded `runner.py` does it for you. For modes B/C, see
+[recipes for modes B and C](/runtime/recipes) for copy-pasteable Bash
+patterns that fulfil every clause below.
 
 ## Workspace layout
 
@@ -221,7 +223,7 @@ to be cancellable mid-computation.
 | Artifacts auto-upload | ✓ | ✓ | ✓ |
 | SIGTERM grace | ✓ | ✓ | ✓ |
 
-Modes B and C are run-blocked at the moment of writing — see the
-[manifest runtime modes](/manifest/runtime-modes) page for the deploy
-status. The contract above is the target shape; mode A already
-implements every row.
+Mode A's `runner.py` implements every row above for you. For modes B
+and C, see [recipes](/runtime/recipes) for the patterns that fulfil
+each clause from a Bash entrypoint — and any other language follows
+the same shape.

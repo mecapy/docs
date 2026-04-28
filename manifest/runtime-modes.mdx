@@ -157,18 +157,15 @@ The schemas drive the workflow editor's typing and the AutoForm UI.
 They are also what the worker uses to decide what goes into
 `in/data.json` vs. `in/files/`.
 
-## Deploy vs. run status
+## Deploy and run status
 
-The deploy path supports all three modes — `POST /packages/from-git`
-(or `from-zip`) accepts any `runtime.kind`, persists the
+All three modes are wired end-to-end as of session 34: `POST /packages/
+from-git` (or `from-zip`) accepts any `runtime.kind`, persists the
 mode-specific fields (handler vs. entrypoint, dockerfile path,
-image_ref), and returns the FunctionVersion as usual.
+image_ref), and the worker can build / pull and run the resulting
+image. Workflows can compose nodes from any mode.
 
-<Note>
-  **Run status as of session 33.** Mode A is fully wired end-to-end
-  (build, run, workflows). Modes B and C deploy successfully but the
-  worker doesn't yet build/pull and run their images — invoking them
-  returns `501 Not Implemented` with a hint pointing here. The wiring
-  on the worker side is the next planned phase; the runtime contract
-  is already complete and host-side enforced for all three modes.
-</Note>
+For modes B and C, the entrypoint script is responsible for fulfilling
+the [runtime contract](/runtime/contract). See
+[recipes for modes B and C](/runtime/recipes) for copy-pasteable Bash
+patterns covering inputs, outputs, progress, errors, and SIGTERM grace.

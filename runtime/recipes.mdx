@@ -1,0 +1,413 @@
+---
+title: "Recipes for modes B and C"
+description: "Bash-first cookbook for fulfilling the runtime contract from a Dockerfile or pre-built image — no Python required."
+---
+
+The [runtime contract](/runtime/contract) is language-agnostic: a few
+files, a few env vars, two signals. This page shows the concrete
+patterns that turn that contract into runnable code in **modes B**
+(`runtime.kind: dockerfile`) and **C** (`runtime.kind: image`).
+
+The recipes use Bash + `jq` because they're the lowest common
+denominator — every base image either already ships them or can install
+them in one apt line. The same patterns map line-by-line to any other
+language; see [porting](#porting-to-other-languages) at the bottom.
+
+<Note>
+  Mode A (`runtime.kind: python`) doesn't need any of this. MecaPy's
+  embedded `runner.py` reads `in/data.json`, calls your handler, writes
+  `out/data.json`, and reports uncaught exceptions for you. These
+  recipes are only for users shipping their own image.
+</Note>
+
+## Prerequisites
+
+Your image needs:
+
+- **`bash`** (or another POSIX shell with traps). Available everywhere.
+- **`jq`** for reading `in/data.json` and writing `out/data.json`.
+  `apt-get install -y jq` works on Debian/Ubuntu bases.
+
+```dockerfile
+FROM ubuntu:24.04
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends bash jq \
+ && rm -rf /var/lib/apt/lists/*
+COPY entrypoint.sh /opt/entrypoint.sh
+RUN chmod +x /opt/entrypoint.sh
+ENTRYPOINT ["/opt/entrypoint.sh"]
+```
+
+`mecapy.yml` (mode B):
+
+```yaml
+version: "1"
+package: { name: my-pkg, version: 1.0.0 }
+runtime:
+  kind: dockerfile
+  dockerfile: Dockerfile
+  context: .
+functions:
+  solve:
+    entrypoint: ["/opt/entrypoint.sh"]
+    inputs:  { x: float, y: float }
+    outputs: { sum: float }
+    resources: { cpu: 1, memory_mb: 512, timeout: 60 }
+```
+
+## Recipe 1 — Script header (always include)
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Workspace paths — fixed by the runtime contract.
+IN_DATA=/workspace/in/data.json
+IN_FILES=/workspace/in/files
+OUT_DATA=/workspace/out/data.json
+OUT_FILES=/workspace/out/files
+OUT_ARTIFACTS=/workspace/out/artifacts
+PROGRESS=/workspace/out/progress.jsonl
+ERROR_FILE=/workspace/out/_error.json
+SCRATCH="${MECAPY_SCRATCH:-/workspace/scratch}"
+```
+
+`set -euo pipefail` is non-negotiable: without `-e` a failed step
+silently continues; without `-u` a typo on an env var name returns the
+empty string and your downstream `jq` queries return null; without
+`-o pipefail` a failure inside a pipeline is hidden by the trailing
+command's exit code. All three together turn shell into something you
+can reason about.
+
+## Recipe 2 — Top-level error trap → `_error.json`
+
+This is the most important recipe. Without it, a hard crash leaves the
+worker with only stderr — useful for debugging but not actionable for
+the user looking at the run page.
+
+```bash
+report_error() {
+  local exit_code=$?
+  local line_no=$1
+  local cmd=$2
+  jq -n \
+    --arg error "command '${cmd}' failed at line ${line_no} with exit ${exit_code}" \
+    --arg type  "ScriptError" \
+    --arg ts    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{error: $error, type: $type, ts: $ts}' > "$ERROR_FILE"
+  exit "$exit_code"
+}
+trap 'report_error "$LINENO" "$BASH_COMMAND"' ERR
+```
+
+Place this **before** any work happens. The `ERR` trap fires on every
+non-zero exit (because of `-e`); the structured JSON ends up at
+`/workspace/out/_error.json`, which the worker reads in priority over
+stderr when surfacing the failure.
+
+When you call out to a binary whose exit code carries semantic meaning,
+override the message:
+
+```bash
+if ! /usr/bin/aster --input case.json > aster.log 2>&1; then
+  jq -n \
+    --arg error   "code_aster failed to converge" \
+    --arg type    "SolverDivergence" \
+    --arg trace   "$(tail -n 50 aster.log)" \
+    --arg ts      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{error: $error, type: $type, traceback: $trace, ts: $ts}' > "$ERROR_FILE"
+  exit 2
+fi
+```
+
+## Recipe 3 — Read `in/data.json`
+
+```bash
+# Pull scalar inputs into local variables. -r strips JSON quotes from strings.
+diameter_mm=$(jq -r '.diameter_mm' "$IN_DATA")
+load_n=$(jq -r '.load_n' "$IN_DATA")
+material=$(jq -r '.material' "$IN_DATA")
+
+# Optional input with a default — // is jq's "if null".
+factor=$(jq -r '.safety_factor // 1.5' "$IN_DATA")
+```
+
+For a list or nested dict, leave it as JSON and pass through:
+
+```bash
+forces_json=$(jq -c '.forces' "$IN_DATA")  # -c keeps it on one line
+echo "$forces_json" > "$SCRATCH/forces.json"
+```
+
+## Recipe 4 — Read `in/files/`
+
+The variable name on disk is the **stem** (extension stripped). For an
+input port `mesh: File[csv,med]`, MecaPy writes `in/files/mesh.csv` or
+`in/files/mesh.med` — extension preserved verbatim.
+
+```bash
+# Find the file regardless of extension.
+mesh=$(ls "$IN_FILES"/mesh.* 2>/dev/null | head -n 1)
+if [[ -z "$mesh" ]]; then
+  echo "missing required input file: mesh.*" >&2
+  exit 1
+fi
+```
+
+If a port is **optional** (declared `required: false` in the manifest)
+and not supplied, no file is written — a defensive `[[ -f ... ]]`
+check is enough.
+
+## Recipe 5 — Resource limits
+
+```bash
+cpu="$MECAPY_CPU_LIMIT"           # e.g. "2"
+mem_mb="$MECAPY_MEM_LIMIT_MB"     # e.g. "2048"
+scratch="$MECAPY_SCRATCH"         # /workspace/scratch
+
+# Use them to size sub-processes:
+mpiexec -n "$cpu" my_solver --workdir "$scratch"
+```
+
+Read these instead of `/sys/fs/cgroup/...`. The env vars are stable
+across cgroup v1 / v2 and any future container runtime change.
+
+## Recipe 6 — Progress reporting
+
+Append one JSON object per line to `progress.jsonl`. The worker drains
+the file between log chunks and forwards events to the run page.
+
+```bash
+emit_progress() {
+  jq -n -c \
+    --argjson step  "$1" \
+    --argjson total "$2" \
+    --arg     msg   "$3" \
+    '{step: $step, total: $total, message: $msg}' >> "$PROGRESS"
+}
+
+emit_progress 1 3 "loading mesh"
+load_mesh
+emit_progress 2 3 "solving"
+solve
+emit_progress 3 3 "writing outputs"
+```
+
+`-c` keeps each event on a single line. `-n` builds the JSON from
+scratch. The schema is open: `step` / `total` / `message` is
+conventional but you can attach any keys you like.
+
+<Tip>
+  A fully silent job (no stdout, no progress) only flushes its
+  progress on exit — the worker drains between log chunks. If your
+  computation runs for minutes without printing anything, emit a
+  heartbeat every 30 s or so to keep the run page lively.
+</Tip>
+
+## Recipe 7 — Write `out/data.json`
+
+```bash
+# Build from scratch with --argjson for numbers, --arg for strings.
+jq -n \
+  --argjson stress_mpa "$stress_mpa" \
+  --argjson margin     "$margin" \
+  --arg     status     "ok" \
+  '{stress_mpa: $stress_mpa, margin: $margin, status: $status}' > "$OUT_DATA"
+```
+
+`--argjson` parses the value as JSON (so numbers stay numbers).
+`--arg` always treats the value as a string. Mixing them up is the #1
+shell-typing bug.
+
+For a result you've already computed in JSON form (e.g. piped from a
+solver):
+
+```bash
+my_solver --json | jq '.' > "$OUT_DATA"   # `jq '.'` validates the JSON
+```
+
+## Recipe 8 — Write `out/files/`
+
+The names of expected output files are in `out/files/list.json` —
+written by the worker before your code starts:
+
+```json
+{ "required": ["report"], "optional": ["debug_dump"] }
+```
+
+You read it if you want, but the simpler path is to know which files
+your manifest declares and write them with the right stem:
+
+```bash
+# Output port `report: File[pdf]` → write report.pdf
+generate_report > "$OUT_FILES/report.pdf"
+
+# Optional debug dump
+if [[ -n "${DEBUG:-}" ]]; then
+  cp "$SCRATCH/dump.bin" "$OUT_FILES/debug_dump.bin"
+fi
+```
+
+The worker validates that every `required` name is present (any
+extension) after your script exits; missing files fail the run.
+
+## Recipe 9 — Write `out/artifacts/`
+
+Free-form: anything you drop in `out/artifacts/` is uploaded to S3 and
+referenced from the run's `_artifacts` block. No naming constraints,
+no schema, no required vs optional.
+
+```bash
+# Logs, intermediate data, anything diagnostic.
+cp aster.log "$OUT_ARTIFACTS/aster.log"
+tar czf "$OUT_ARTIFACTS/intermediate.tar.gz" "$SCRATCH"/results.*
+```
+
+Use this for things that aren't typed outputs but help debugging. The
+API surfaces them as `{filename: {uri, size, sha256}}` in the run
+result; downstream workflow nodes can reference them.
+
+## Recipe 10 — SIGTERM grace
+
+When a run is cancelled, the worker sends **SIGTERM** and waits a
+grace period (default 5 s) before escalating to **SIGKILL**. Use the
+window to flush partial state.
+
+```bash
+on_term() {
+  echo "received SIGTERM, flushing partial outputs" >&2
+  # Best-effort: dump whatever you have so the user can inspect.
+  cp "$SCRATCH"/results.* "$OUT_ARTIFACTS/" 2>/dev/null || true
+  jq -n \
+    --arg error "cancelled by request" \
+    --arg type  "Cancelled" \
+    --arg ts    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{error: $error, type: $type, ts: $ts}' > "$ERROR_FILE"
+  exit 143  # 128 + SIGTERM(15)
+}
+trap on_term TERM
+```
+
+If your script spawns a long-running child, propagate the signal:
+
+```bash
+my_solver &
+child_pid=$!
+trap "kill -TERM $child_pid 2>/dev/null; wait $child_pid; on_term" TERM
+wait $child_pid
+```
+
+A naked background process **outlives** the trap if you don't `wait`
+on it explicitly.
+
+## Full template
+
+End-to-end script combining every recipe. Drop into your Dockerfile as
+`/opt/entrypoint.sh`, declare it as `entrypoint:` in `mecapy.yml`,
+done.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+IN_DATA=/workspace/in/data.json
+IN_FILES=/workspace/in/files
+OUT_DATA=/workspace/out/data.json
+OUT_FILES=/workspace/out/files
+OUT_ARTIFACTS=/workspace/out/artifacts
+PROGRESS=/workspace/out/progress.jsonl
+ERROR_FILE=/workspace/out/_error.json
+SCRATCH="${MECAPY_SCRATCH:-/workspace/scratch}"
+
+# --- Error reporting --------------------------------------------------
+report_error() {
+  local exit_code=$?
+  jq -n \
+    --arg error "command '$BASH_COMMAND' failed at line $1 with exit $exit_code" \
+    --arg type  "ScriptError" \
+    --arg ts    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{error: $error, type: $type, ts: $ts}' > "$ERROR_FILE"
+  exit "$exit_code"
+}
+trap 'report_error "$LINENO"' ERR
+
+emit_progress() {
+  jq -n -c \
+    --argjson step "$1" --argjson total "$2" --arg msg "$3" \
+    '{step: $step, total: $total, message: $msg}' >> "$PROGRESS"
+}
+
+# --- Inputs -----------------------------------------------------------
+emit_progress 1 4 "reading inputs"
+diameter_mm=$(jq -r '.diameter_mm' "$IN_DATA")
+load_n=$(jq -r '.load_n' "$IN_DATA")
+mesh=$(ls "$IN_FILES"/mesh.* | head -n 1)
+
+# --- Compute ----------------------------------------------------------
+emit_progress 2 4 "running solver"
+cpu="$MECAPY_CPU_LIMIT"
+my_solver --threads "$cpu" --mesh "$mesh" \
+          --diameter "$diameter_mm" --load "$load_n" \
+          --workdir "$SCRATCH" \
+          > "$SCRATCH/solver.log" 2>&1
+
+# --- Outputs ----------------------------------------------------------
+emit_progress 3 4 "writing outputs"
+stress=$(jq -r '.stress_mpa' "$SCRATCH/solver_result.json")
+margin=$(jq -r '.margin'     "$SCRATCH/solver_result.json")
+
+jq -n --argjson stress "$stress" --argjson margin "$margin" \
+  '{stress_mpa: $stress, margin: $margin}' > "$OUT_DATA"
+
+cp "$SCRATCH/solver_result.json"  "$OUT_FILES/result.json"
+cp "$SCRATCH/solver.log"          "$OUT_ARTIFACTS/solver.log"
+
+emit_progress 4 4 "done"
+```
+
+## Porting to other languages
+
+Every recipe maps to any language with file I/O, env vars, and signal
+handlers. The semantics are the same; only the syntax changes.
+
+| Concern | Bash + jq | Python | Node |
+|---|---|---|---|
+| Read `in/data.json` | `jq -r '.x' "$IN_DATA"` | `json.loads(open("/workspace/in/data.json").read())` | `JSON.parse(fs.readFileSync(...))` |
+| Write `out/data.json` | `jq -n ... > "$OUT_DATA"` | `open(..., "w").write(json.dumps(...))` | `fs.writeFileSync(..., JSON.stringify(...))` |
+| Append `progress.jsonl` | `>> "$PROGRESS"` (with `\n`) | `f.write(json.dumps(d) + "\n")` | `fs.appendFileSync(..., line + "\n")` |
+| `_error.json` on crash | `trap ... ERR` | `try/except` at module top | `process.on("uncaughtException", ...)` |
+| SIGTERM | `trap ... TERM` | `signal.signal(signal.SIGTERM, ...)` | `process.on("SIGTERM", ...)` |
+| Resource limits | `$MECAPY_CPU_LIMIT` | `os.environ["MECAPY_CPU_LIMIT"]` | `process.env.MECAPY_CPU_LIMIT` |
+
+The key invariants — file paths, JSON shapes, signal semantics — are
+the same regardless of language. Pick whichever stack matches your
+solver's natural ecosystem; MecaPy treats them all as opaque images.
+
+## Operational notes
+
+- **`jq` is the only hard dependency** of this cookbook. If you can't
+  install it (e.g. a vendored solver image you can't modify), drop down
+  to `python3 -c '...'` for the JSON I/O — it's available on more bases
+  than `jq`.
+- **`scratch/` is wiped between runs** even on cached containers. Don't
+  rely on anything you wrote there persisting from one invocation to
+  the next.
+- **The container is started with `entrypoint=["sleep", "infinity"]`**
+  by the worker for cache reuse, then your `entrypoint:` is invoked via
+  `exec_run`. This means your image's own `ENTRYPOINT` / `CMD` is
+  overridden — what runs is exactly the argv list in the manifest's
+  `functions.<name>.entrypoint`.
+- **Network is disabled** by default (`--network=none`). If your solver
+  needs to pull data from the internet, surface that as a File input or
+  a registry image (mode C with image pull happening before the run).
+
+## See also
+
+- [Runtime contract](/runtime/contract) — the source of truth for
+  files, env vars, and signals these recipes implement.
+- [Manifest runtime modes](/manifest/runtime-modes) — when to pick A
+  vs B vs C.
+- [Code scanning](/security/code-scanning) — what the AST/regex scanner
+  blocks at deploy time. Mode B/C wrappers that invoke external binaries
+  via `subprocess` are still subject to the per-language rules of
+  whichever module they ship.
